@@ -29,7 +29,7 @@ def get_sets(collection: CardsCollection) -> Sets:
                         "_id": "$set_name",
                     }
                 },
-                {"$sort": {"_id": -1}},
+                {"$sort": {"_id": 1}},  # 1 for ascending (alphabetical) order
             ]
         )
     ]
