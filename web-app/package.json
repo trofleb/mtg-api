@@ -64,5 +64,9 @@
     "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.0.9"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.0.14",
+    "lightningcss-linux-x64-gnu": "^1.30.2"
   }
 }
