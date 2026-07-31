@@ -2,8 +2,9 @@
 
 import os
 
-from fastapi import FastAPI
 from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 # Initialize FastMCP server
 mcp = FastMCP(
@@ -20,25 +21,20 @@ mcp = FastMCP(
 # Resources auto-register via @mcp.resource() decorators
 from mcp_server.resources import cards  # noqa: E402, F401
 
-# Create a FastAPI app for health checks
-# FastMCP uses this internally for HTTP/SSE transport
-app = FastAPI()
 
-
-@app.get("/health")
-async def health_check() -> dict:
+# Health check endpoint, served alongside the MCP transport on /mcp.
+# custom_route registers directly on the app FastMCP serves; the previous
+# approach mounted a separate FastAPI app onto mcp._fastapi_app, an
+# attribute FastMCP does not expose, so the guard never fired and /health
+# returned 404.
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> JSONResponse:
     """Health check endpoint for Docker container monitoring.
 
     Returns:
-        Status dictionary with "status": "ok"
+        JSON response with "status": "ok"
     """
-    return {"status": "ok"}
-
-
-# Mount health check to MCP app
-# This allows the Docker healthcheck to work while MCP handles /mcp endpoint
-if hasattr(mcp, "_fastapi_app"):
-    mcp._fastapi_app.mount("/health", app)
+    return JSONResponse({"status": "ok"})
 
 
 def main() -> None:
