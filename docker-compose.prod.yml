@@ -152,9 +152,44 @@ services:
       retries: 3
       start_period: 5s
 
+  # Init container: normalises volume ownership before MongoDB starts.
+  # The Bitnami image runs as uid 1001, gid 0. A volume carrying ownership
+  # from anywhere else - a restored backup, a host directory, or the official
+  # mongo image, which uses uid 999 - leaves mongod unable to write its data
+  # directory, and the container dies with "Permission denied".
+  # Runs to completion on every `up`; a no-op once ownership is correct.
+  db-init:
+    image: busybox:1.37
+    # Reassigning ownership of a volume owned by another uid requires root,
+    # so this is the one root container in the stack. It is stripped to the
+    # two capabilities that actually need: CHOWN to reassign ownership, and
+    # DAC_OVERRIDE to traverse directories whose mode would otherwise deny
+    # it. It holds no network and exits before mongod starts.
+    user: root
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    command: chown -R 1001:0 /bitnami/mongodb
+    volumes:
+      - cards_data:/bitnami/mongodb
+    network_mode: none
+    restart: "no"
+
   db:
     platform: linux/x86_64
     image: bitnamilegacy/mongodb:8.0.4
+    # mongod runs unprivileged as uid 1001, gid 0. Pinned explicitly rather
+    # than inherited from the image so the guarantee survives an image bump,
+    # and with no capabilities, since mongod needs none on port 27017.
+    user: "1001:0"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: always
     networks:
       - dokploy-network
@@ -166,6 +201,9 @@ services:
       - MONGODB_USERNAME=root
       - MONGODB_PASSWORD=root
       - MONGODB_ROOT_PASSWORD=root
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping')"]
       interval: 10s
