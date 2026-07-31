@@ -100,8 +100,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/api:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/api:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/api:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/api:buildcache,mode=max
 
   docker-build-app:
     name: Build and Push Streamlit App Image
@@ -148,8 +148,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/app:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/app:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/app:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/app:buildcache,mode=max
 
   docker-build-web-app:
     name: Build and Push Web App Image
@@ -196,8 +196,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/web-app:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/web-app:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/web-app:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/web-app:buildcache,mode=max
 
   docker-build-huey:
     name: Build and Push Huey Worker Image
@@ -244,8 +244,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/huey:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/huey:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/huey:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/huey:buildcache,mode=max
 
   docker-build-mcp:
     name: Build and Push MCP Server Image
@@ -292,5 +292,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/mcp:buildcache
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/mtg-api/mcp:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/mcp:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository }}/mcp:buildcache,mode=max
