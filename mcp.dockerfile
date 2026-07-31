@@ -32,7 +32,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN groupadd -r mcp && useradd -r -g mcp mcp
+# useradd -r alone records /home/mcp as HOME without creating it, and
+# /home is root-owned, so anything writing under $HOME fails with
+# "Permission denied".
+RUN groupadd -r mcp && useradd -r -g mcp -m -d /home/mcp mcp
 
 # Copy application from builder
 COPY --from=builder --chown=mcp:mcp /app /app
