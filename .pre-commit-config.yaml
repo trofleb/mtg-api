@@ -42,3 +42,13 @@ repos:
         language: system
         files: ^web-app/.*\.(ts|tsx)$
         pass_filenames: false
+      - id: pnpm-lockfile-check
+        name: pnpm lockfile up to date (web-app)
+        # Mirrors the `pnpm install --frozen-lockfile` that CI runs, so a
+        # package.json edit without a matching lockfile update fails here
+        # instead of in the pipeline. Skips resolution when in sync, so it
+        # stays fast and needs no network.
+        entry: bash -c 'cd web-app && pnpm install --lockfile-only --frozen-lockfile'
+        language: system
+        files: ^web-app/(package\.json|pnpm-lock\.yaml)$
+        pass_filenames: false

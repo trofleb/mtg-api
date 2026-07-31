@@ -68,22 +68,22 @@ def test_get_sets_empty_database_returns_empty_list(test_client_empty):
 
 
 @pytest.mark.integration
-def test_get_sets_returns_alphabetically_sorted_descending(test_client):
-    """Test that /sets endpoint returns sets sorted Z→A alphabetically.
+def test_get_sets_returns_alphabetically_sorted_ascending(test_client):
+    """Test that /sets endpoint returns sets sorted A→Z alphabetically.
 
     This test validates that:
-    - MongoDB $sort stage with _id: -1 works correctly
-    - Sets are in descending alphabetical order
+    - MongoDB $sort stage with _id: 1 works correctly
+    - Sets are in ascending alphabetical order
     - Order is consistent across calls
 
-    Expected order (Z→A):
-    1. Rise of the Eldrazi
-    2. Return to Ravnica
-    3. Magic 2011
+    Expected order (A→Z):
+    1. Conflux
+    2. Double Masters
+    3. Innistrad
     4. Limited Edition Alpha
-    5. Innistrad
-    6. Double Masters
-    7. Conflux
+    5. Magic 2011
+    6. Return to Ravnica
+    7. Rise of the Eldrazi
     """
     response = test_client.get("/sets")
 
@@ -95,5 +95,5 @@ def test_get_sets_returns_alphabetically_sorted_descending(test_client):
     # Verify we have all 7 sets (updated with Phase 5 fixtures)
     assert len(sets) == 7
 
-    # Alternative verification: ensure list is sorted in descending order
-    assert sets == sorted(sets, reverse=True)
+    # Verify list is sorted in ascending (alphabetical) order
+    assert sets == sorted(sets)
