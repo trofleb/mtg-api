@@ -31,8 +31,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN groupadd -r app && useradd -r -g app app
+# Create non-root user with a home directory. useradd -r alone records
+# /home/app as HOME without creating it, and /home is root-owned, so
+# anything writing under $HOME - Streamlit's machine-id file, for one -
+# fails with "Permission denied: '/home/app'".
+RUN groupadd -r app && useradd -r -g app -m -d /home/app app
 
 # Copy application from builder
 COPY --from=builder --chown=app:app /app /app
