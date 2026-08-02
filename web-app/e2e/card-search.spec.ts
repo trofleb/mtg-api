@@ -50,7 +50,9 @@ test.describe("MTG Card Search", () => {
   });
 
   test("should toggle filters panel", async ({ page }) => {
-    const filtersButton = page.getByRole("button", { name: "Filters" });
+    // exact: true, or this also matches "Apply Filters" once the panel is
+    // open and the click fails on a strict-mode violation.
+    const filtersButton = page.getByRole("button", { name: "Filters", exact: true });
 
     // Filters should be hidden initially
     await expect(page.getByText("Card Types")).not.toBeVisible();
