@@ -78,6 +78,10 @@ services:
     restart: always
     networks:
       - dokploy-network
+    volumes:
+      # Next.js writes its ISR pages and fetch cache here. Without a mount it
+      # grows inside the container layer, unbounded and invisible.
+      - next_cache:/app/.next/cache
     ports:
       - "8080:3000"
     environment:
@@ -260,6 +264,20 @@ services:
 volumes:
   cards_data:
   huey_data:
+  # tmpfs, because it is the only volume type Docker can actually put a size
+  # limit on: the local driver rejects a size option without a backing block
+  # device, so a disk-backed volume would grow without bound.
+  #
+  # The tradeoff is that this is RAM and it empties on restart. Both are
+  # acceptable for a cache that regenerates itself - the first request for
+  # each card repopulates it. Raise or lower the size to trade memory for
+  # cache hits; when it fills, Next.js simply stops caching new entries.
+  next_cache:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=100m
 
 networks:
   dokploy-network:
