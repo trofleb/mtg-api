@@ -9,6 +9,13 @@ import { getCardByOracleId } from "@/lib/api";
 // refresh, or a shared link resolves to - the modal in @modal is only an
 // interception of this route when navigating from the grid.
 
+export const revalidate = 3600;
+
+// Enables the full route cache for on-demand params.
+export async function generateStaticParams() {
+  return [];
+}
+
 interface CardPageProps {
   params: Promise<{ id: string }>;
 }
