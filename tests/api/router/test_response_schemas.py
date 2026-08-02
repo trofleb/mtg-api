@@ -85,7 +85,7 @@ def test_search_response_structure(test_client):
 
     # Validate first aggregated card structure
     first_card = data["cards"][0]
-    assert "_id" in first_card  # Oracle ID
+    assert "id" in first_card  # Oracle ID
     assert "name" in first_card
     assert "card_count" in first_card
     assert "cards" in first_card  # Array of all printings

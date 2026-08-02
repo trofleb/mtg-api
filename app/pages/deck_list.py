@@ -25,16 +25,21 @@ def get_card(info: CardSearch):
         # "special": "special",
         # "foil": "foil",
     }
-    card = get(
+    response = get(
         f"http://api:8000/cards/{info['name']}",
         params={
             map_to_params[key]: info[key]
             for key in info
             if key in map_to_params and info[key]
         },
-    ).json()
-    # st.json(card)
-    return card
+    )
+
+    # An unknown card is a 404 whose body is an error object, which is truthy.
+    # Return None so the caller's "Could not find" check still works.
+    if response.status_code == 404:
+        return None
+
+    return response.json()
 
 
 deck_list = st.text_area("Deck list")

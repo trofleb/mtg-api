@@ -33,8 +33,8 @@ def test_get_card_by_name_success(test_client):
     data = response.json()
     assert data is not None
     assert data["name"] == "Lightning Bolt"
-    # Aggregated result uses _id field for oracle_id
-    assert data["_id"] == "b29c8b8a-2c8f-4891-88bc-f35d07a68293"
+    # Aggregated result exposes the oracle_id as "id"
+    assert data["id"] == "b29c8b8a-2c8f-4891-88bc-f35d07a68293"
 
     # Verify it's the aggregated result with multiple printings
     assert "cards" in data
@@ -95,20 +95,23 @@ def test_get_card_by_name_with_set_filter(test_client):
 
 @pytest.mark.integration
 def test_get_card_by_name_not_found(test_client):
-    """Test that /cards/{name} endpoint returns None when card not found.
+    """Test that /cards/{name} endpoint returns 404 when card not found.
 
     This test validates that:
-    - Non-existent card names return None (not 404!)
-    - Empty aggregation results are handled gracefully
-    - Response is null, not error message
-    - Status code is still 200 (successful request, null response)
+    - Non-existent card names raise HTTPException
+    - An empty aggregation result is an error, not a 200 with a null body,
+      which callers cannot distinguish from a successful empty response
+    - Response includes a detail field naming the card
 
-    Expected: None for non-existent card "Nonexistent Card"
+    Expected: 404 for non-existent card "nonexistent card"
     """
     response = test_client.get("/cards/nonexistent card")
 
-    assert response.status_code == 200
-    assert response.json() is None
+    assert response.status_code == 404
+
+    data = response.json()
+    assert "detail" in data
+    assert "nonexistent card" in data["detail"]
 
 
 @pytest.mark.integration
@@ -222,3 +225,56 @@ def test_get_cards_by_oracle_id_not_found(test_client):
     assert "detail" in data
     assert fake_oracle_id in data["detail"]
     assert "no cards found" in data["detail"].lower()
+
+
+@pytest.mark.integration
+def test_get_aggregated_card_by_oracle_id_success(test_client):
+    """Test that /cards/oracle/{oracle_id}/aggregated groups all printings.
+
+    This test validates that:
+    - Printings sharing an oracle_id collapse into a single document
+    - The shape matches what /cards/search/{text} returns per result,
+      so a card can be rendered from an Oracle ID alone
+    - Oracle-level fields are present, not just per-printing ones
+    - Every printing is retained under "cards"
+
+    Expected: Lightning Bolt aggregated across its 2 printings
+    """
+    oracle_id = "b29c8b8a-2c8f-4891-88bc-f35d07a68293"
+    response = test_client.get(f"/cards/oracle/{oracle_id}/aggregated")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    # Grouped documents expose the oracle_id as "id"
+    assert data["id"] == oracle_id
+    assert data["name"] == "Lightning Bolt"
+
+    # Oracle-level fields the raw printings endpoint does not provide
+    assert "card_text" in data
+    assert "card_count" in data
+    assert data["card_count"] == 2
+
+    # Both printings retained
+    assert len(data["cards"]) == 2
+
+
+@pytest.mark.integration
+def test_get_aggregated_card_by_oracle_id_not_found(test_client):
+    """Test that /cards/oracle/{oracle_id}/aggregated 404s for unknown IDs.
+
+    This test validates that:
+    - An unmatched oracle_id yields 404 rather than an empty document
+    - The error message names the offending ID
+
+    Expected: 404 for a non-existent Oracle UUID
+    """
+    fake_oracle_id = "00000000-0000-0000-0000-000000000000"
+    response = test_client.get(f"/cards/oracle/{fake_oracle_id}/aggregated")
+
+    assert response.status_code == 404
+
+    data = response.json()
+    assert "detail" in data
+    assert fake_oracle_id in data["detail"]
