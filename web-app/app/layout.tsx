@@ -17,12 +17,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  // Parallel route slot for intercepted card details, rendered above the
+  // page. Resolves to null via @modal/default.tsx on ordinary routes.
+  modal: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} antialiased`}>{children}</body>
+      <body className={`${inter.variable} antialiased`}>
+        {children}
+        {modal}
+      </body>
     </html>
   );
 }

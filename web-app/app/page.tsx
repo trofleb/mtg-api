@@ -1,6 +1,32 @@
-import { CardSearch } from "@/components/card-search";
+import Link from "next/link";
+import { CardGrid } from "@/components/card-grid";
+import { SearchForm } from "@/components/search-form";
+import { Button } from "@/components/ui/button";
+import { getAllSets, searchCards } from "@/lib/api";
+import { buildSearchParams, parseSearchParams, type RawSearchParams } from "@/lib/search-params";
 
-export default function Home() {
+// Async server component: the search runs here, on the server, inside the
+// Docker network. Results are in the initial HTML, so the page is readable
+// without JavaScript and every search is a shareable URL.
+
+interface HomeProps {
+  searchParams: Promise<RawSearchParams>;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const state = parseSearchParams(await searchParams);
+
+  // Both calls are server-side; run them together rather than in sequence.
+  const [results, sets] = await Promise.all([
+    searchCards(state.query, state.cursor, state.filters),
+    getAllSets().catch(() => [] as string[]),
+  ]);
+
+  const nextHref =
+    results.has_more && results.cursor
+      ? `/?${buildSearchParams({ ...state, cursor: results.cursor })}`
+      : null;
+
   return (
     <main className="min-h-screen p-8">
       <div className="max-w-7xl mx-auto">
@@ -19,7 +45,41 @@ export default function Home() {
             . Thank you so much for all the data!
           </p>
         </header>
-        <CardSearch />
+
+        <div className="space-y-6">
+          <SearchForm sets={sets} state={state} />
+
+          {results.cards.length > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                <strong>
+                  {results.cards.length}
+                  {results.has_more ? "+" : ""}
+                </strong>{" "}
+                results found
+              </p>
+            </div>
+          )}
+
+          <CardGrid cards={results.cards} />
+
+          {(state.cursor || nextHref) && (
+            <div className="flex justify-center gap-2 pt-4">
+              {state.cursor && (
+                <Button variant="outline" asChild>
+                  <Link href={`/?${buildSearchParams({ ...state, cursor: null })}`}>
+                    Back to start
+                  </Link>
+                </Button>
+              )}
+              {nextHref && (
+                <Button variant="outline" asChild>
+                  <Link href={nextHref}>Load More Cards</Link>
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

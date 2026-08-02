@@ -47,7 +47,25 @@ export interface SearchResponse {
   has_more: boolean;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Aggregated cards are keyed on the oracle_id. The API now exposes that as
+// "id", but older builds returned MongoDB's raw "_id", and the two images
+// deploy independently - so accept either and always hand back "id".
+type RawOracleCard = Omit<OracleCard, "id"> & { id?: string; _id?: string };
+
+function normaliseCard(raw: RawOracleCard): OracleCard {
+  const { _id, ...rest } = raw;
+  return { ...rest, id: rest.id ?? _id ?? "" };
+}
+
+// Server-side only. These are called from server components, so the fetch
+// runs in the Next.js process inside the Docker network and the API is never
+// addressed by the browser. There is no client-callable wrapper around them:
+// no route handler, no proxy rewrite, no server action.
+//
+// API_URL is a plain (non-NEXT_PUBLIC) variable on purpose: it is read at
+// runtime on the server and never inlined into the client bundle, so the
+// API hostname does not leave the network.
+const API_BASE_URL = process.env.API_URL ?? "http://api:8000";
 
 export async function searchCards(
   text: string,
@@ -121,7 +139,31 @@ export async function searchCards(
     throw new Error(`Failed to search cards: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  return { ...data, cards: (data.cards ?? []).map(normaliseCard) };
+}
+
+/** Fetch one card, aggregated across all of its printings, by Oracle ID. */
+export async function getCardByOracleId(oracleId: string): Promise<OracleCard | null> {
+  const response = await fetch(
+    `${API_BASE_URL}/cards/oracle/${encodeURIComponent(oracleId)}/aggregated`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch card: ${response.statusText}`);
+  }
+
+  return normaliseCard(await response.json());
 }
 
 export async function getAllSets(): Promise<string[]> {
