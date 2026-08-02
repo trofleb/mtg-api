@@ -105,12 +105,44 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+  # Init container: normalises volume ownership before Huey starts.
+  # Same failure as db-init, one image over. Huey keeps its task queue in a
+  # SQLite database on huey_data, and the consumer runs as uid 999. A volume
+  # created while the image still ran as root stays root-owned - Docker only
+  # adopts the image's ownership onto a volume that is still empty - so
+  # SQLite cannot create huey.db-wal beside the database and the consumer
+  # dies with "Permission denied". Directory ownership is what matters here,
+  # not the database file's: SQLite writes its WAL and journal as siblings.
+  # Runs to completion on every `up`; a no-op once ownership is correct.
+  huey-init:
+    image: busybox:1.37
+    user: root
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+    security_opt:
+      - no-new-privileges:true
+    command: chown -R 999:999 /app/db
+    volumes:
+      - huey_data:/app/db
+    network_mode: none
+    restart: "no"
+
   huey:
     platform: linux/x86_64
     image: ghcr.io/trofleb/mtg-api/huey:latest
     build:
       context: .
       dockerfile: huey.dockerfile
+    # Pinned to the uid huey.dockerfile creates, so the guarantee survives an
+    # image bump and matches what huey-init chowns the volume to.
+    user: "999:999"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: always
     networks:
       - dokploy-network
@@ -126,6 +158,8 @@ services:
       - UV_LINK_MODE=copy
       - UV_CACHE_DIR=/tmp/.uv-cache
     depends_on:
+      huey-init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       cache:

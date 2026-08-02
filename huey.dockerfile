@@ -34,7 +34,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Create non-root user with a home directory. useradd -r alone records
 # /home/app as HOME without creating it, and /home is root-owned, so
 # anything writing under $HOME fails with "Permission denied".
-RUN groupadd -r app && useradd -r -g app -m -d /home/app app
+#
+# The uid/gid are pinned rather than left to useradd, which just takes the
+# next free system id. huey-init in docker-compose chowns the huey_data
+# volume to this exact id, so letting it drift - by adding another system
+# user above this line, or bumping the base image - would silently hand the
+# volume to the wrong owner and put back the bug this pinning prevents.
+RUN groupadd -r -g 999 app && useradd -r -u 999 -g app -m -d /home/app app
 
 # Copy application from builder
 COPY --from=builder --chown=app:app /app /app
