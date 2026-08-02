@@ -292,8 +292,18 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
       interval: 15s
       timeout: 5s
-      retries: 3
-      start_period: 20s
+      # Meilisearch opens its index before it binds the port, so a large one
+      # on a slow disk can take minutes to answer /health. start_period is
+      # the knob for that, not retries: a check that fails inside the window
+      # does not count against retries at all, it just leaves the container
+      # "starting". The old 20s meant three failures had already accumulated
+      # by ~65s and the container was declared unhealthy while still loading.
+      #
+      # Retries stay low on purpose. They govern steady state, so raising
+      # them to cover a slow boot would also delay noticing a meilisearch
+      # that dies later. 5 x 15s detects a genuine failure inside 75s.
+      retries: 5
+      start_period: 180s
 
 volumes:
   cards_data:
