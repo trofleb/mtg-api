@@ -67,6 +67,15 @@ function normaliseCard(raw: RawOracleCard): OracleCard {
 // API hostname does not leave the network.
 const API_BASE_URL = process.env.API_URL ?? "http://api:8000";
 
+// A card, aggregated across its printings, is effectively immutable: it only
+// changes when a new printing ships or oracle text is errata'd. Cache it for
+// an hour so a card is fetched once and served from the cache after that.
+//
+// Next.js does not cache fetches by default, so this has to be asked for. The
+// tag lets a single card be invalidated with revalidateTag() without waiting
+// out the hour.
+const CARD_REVALIDATE_SECONDS = 60 * 60;
+
 export async function searchCards(
   text: string,
   cursor?: string | null,
@@ -151,6 +160,10 @@ export async function getCardByOracleId(oracleId: string): Promise<OracleCard | 
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+      },
+      next: {
+        revalidate: CARD_REVALIDATE_SECONDS,
+        tags: ["card", `card:${oracleId}`],
       },
     }
   );

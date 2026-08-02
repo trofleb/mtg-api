@@ -8,6 +8,12 @@ import { getCardByOracleId } from "@/lib/api";
 // The fetch and the markup are still server-side; only the dialog shell is
 // client code. A refresh or a direct visit falls through to app/card/[id].
 
+export const revalidate = 3600;
+
+export async function generateStaticParams() {
+  return [];
+}
+
 interface CardModalProps {
   params: Promise<{ id: string }>;
 }
