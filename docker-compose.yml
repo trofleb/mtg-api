@@ -293,17 +293,22 @@ services:
       interval: 15s
       timeout: 5s
       # Meilisearch opens its index before it binds the port, so a large one
-      # on a slow disk can take minutes to answer /health. start_period is
-      # the knob for that, not retries: a check that fails inside the window
-      # does not count against retries at all, it just leaves the container
-      # "starting". The old 20s meant three failures had already accumulated
-      # by ~65s and the container was declared unhealthy while still loading.
+      # on a slow disk answers /health late and gets declared unhealthy
+      # mid-load, taking down everything that waits on it.
       #
-      # Retries stay low on purpose. They govern steady state, so raising
-      # them to cover a slow boot would also delay noticing a meilisearch
-      # that dies later. 5 x 15s detects a genuine failure inside 75s.
+      # Two knobs bound that and they are not interchangeable: a check that
+      # fails inside start_period does not count against retries, it just
+      # leaves the container "starting". So start_period covers boot, and
+      # retries govern steady state once it is up.
+      #
+      # Kept deliberately tight for now - 20s + 5 x 15s is roughly 95s before
+      # unhealthy, against 65s before. A long start_period would hold the
+      # whole stack in "starting" on every deploy, including when Meilisearch
+      # is genuinely broken. If it still trips this, raise start_period
+      # rather than retries: retries would also delay noticing a Meilisearch
+      # that dies later.
       retries: 5
-      start_period: 180s
+      start_period: 20s
 
 volumes:
   cards_data:
