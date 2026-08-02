@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type CardFilter, getAllSets, searchCards } from "./api";
+import { type CardFilter, getAllSets, getCardByOracleId, searchCards } from "./api";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -16,10 +16,11 @@ describe("api", () => {
 
   describe("searchCards", () => {
     it("should fetch cards with basic search text", async () => {
+      // The API exposes the oracle_id grouping key as "id".
       const mockResponse = {
         cards: [
           {
-            id: "1",
+            id: "oracle-1",
             name: "Black Lotus",
             mana_cost: "{0}",
             type_line: "Artifact",
@@ -46,7 +47,49 @@ describe("api", () => {
           },
         })
       );
-      expect(result).toEqual(mockResponse);
+      expect(result).toEqual({
+        cards: [
+          {
+            id: "oracle-1",
+            name: "Black Lotus",
+            mana_cost: "{0}",
+            type_line: "Artifact",
+          },
+        ],
+        cursor: null,
+        has_more: false,
+      });
+    });
+
+    it("uses id when the API provides it", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [{ id: "oracle-abc", name: "Lightning Bolt" }],
+          cursor: null,
+          has_more: false,
+        }),
+      });
+
+      const result = await searchCards("bolt");
+
+      expect(result.cards[0].id).toBe("oracle-abc");
+    });
+
+    it("falls back to _id from an older API build, without leaking it", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [{ _id: "oracle-legacy", name: "Lightning Bolt" }],
+          cursor: null,
+          has_more: false,
+        }),
+      });
+
+      const result = await searchCards("bolt");
+
+      expect(result.cards[0].id).toBe("oracle-legacy");
+      expect(result.cards[0]).not.toHaveProperty("_id");
     });
 
     it("should include cursor parameter when provided", async () => {
@@ -161,7 +204,7 @@ describe("api", () => {
       await searchCards("test");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("http://localhost:8000/cards/search"),
+        expect.stringContaining("http://api:8000/cards/search"),
         expect.any(Object)
       );
     });
@@ -182,7 +225,7 @@ describe("api", () => {
 
       expect(mockFetch).toHaveBeenCalledOnce();
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:8000/sets",
+        "http://api:8000/sets",
         expect.objectContaining({
           method: "GET",
           headers: {
@@ -200,6 +243,52 @@ describe("api", () => {
       });
 
       await expect(getAllSets()).rejects.toThrow("Failed to fetch sets: Internal Server Error");
+    });
+  });
+
+  describe("getCardByOracleId", () => {
+    it("fetches the aggregated endpoint and normalises _id", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "oracle-xyz", name: "Black Lotus" }),
+      });
+
+      const card = await getCardByOracleId("oracle-xyz");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://api:8000/cards/oracle/oracle-xyz/aggregated",
+        expect.objectContaining({ method: "GET" })
+      );
+      expect(card?.id).toBe("oracle-xyz");
+      expect(card).not.toHaveProperty("_id");
+    });
+
+    it("returns null on 404 rather than throwing, so the page can notFound()", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: "Not Found" });
+
+      await expect(getCardByOracleId("missing")).resolves.toBeNull();
+    });
+
+    it("throws on other failures", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 500, statusText: "Server Error" });
+
+      await expect(getCardByOracleId("boom")).rejects.toThrow("Failed to fetch card: Server Error");
+    });
+
+    it("encodes the oracle id", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "a b", name: "X" }),
+      });
+
+      await getCardByOracleId("a b");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://api:8000/cards/oracle/a%20b/aggregated",
+        expect.any(Object)
+      );
     });
   });
 });

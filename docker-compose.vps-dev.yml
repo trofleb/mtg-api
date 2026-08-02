@@ -80,7 +80,7 @@ services:
       - web-app-next:/app/.next
     environment:
       # Point to VPS API via tunnel service
-      - NEXT_PUBLIC_API_URL=http://ssh-tunnel:8000
+      - API_URL=http://ssh-tunnel:8000
       - NODE_ENV=development
     ports:
       # Expose web-app on localhost only (not on all interfaces)
@@ -91,7 +91,15 @@ services:
     networks:
       - vps-dev-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      # node, not wget: the node:22-slim base in Dockerfile.dev ships neither
+      # wget nor curl, so the previous check could never succeed.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3

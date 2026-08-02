@@ -94,22 +94,29 @@ test.describe("MTG API Endpoints", () => {
   });
 
   test("should get card by scryfall ID", async ({ request }) => {
-    // First, search for a card to get a valid ID
+    // Search groups printings by oracle_id, so a result's own "id" is an
+    // oracle id. /cards/id/ addresses a single printing by scryfall id, so
+    // take one from the nested printings instead.
+    //
+    // Asserted unconditionally: the previous version wrapped this in an
+    // `if (cards[0].id)` that was never true, so the test passed without
+    // exercising anything.
     const searchResponse = await request.get(`${API_BASE_URL}/cards/search/lightning bolt`);
     expect(searchResponse.ok()).toBeTruthy();
 
     const searchData = await searchResponse.json();
-    if (searchData.cards.length > 0 && searchData.cards[0].id) {
-      const cardId = searchData.cards[0].id;
+    expect(searchData.cards.length).toBeGreaterThan(0);
 
-      const response = await request.get(`${API_BASE_URL}/cards/id/${cardId}`);
-      expect(response.ok()).toBeTruthy();
-      expect(response.status()).toBe(200);
+    const printings = searchData.cards[0].cards;
+    expect(printings.length).toBeGreaterThan(0);
 
-      const data = await response.json();
-      expect(data).toHaveProperty("id");
-      expect(data.id).toBe(cardId);
-    }
+    const scryfallId = printings[0].id;
+    const response = await request.get(`${API_BASE_URL}/cards/id/${scryfallId}`);
+
+    expect(response.status()).toBe(200);
+
+    const data = await response.json();
+    expect(data.id).toBe(scryfallId);
   });
 
   test("should handle API errors gracefully", async ({ request }) => {

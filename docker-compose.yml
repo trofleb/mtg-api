@@ -81,7 +81,7 @@ services:
     ports:
       - "8080:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
+      - API_URL=http://api:8000
       - NODE_ENV=production
     depends_on:
       api:

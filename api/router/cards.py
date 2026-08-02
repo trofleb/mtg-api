@@ -12,6 +12,18 @@ from common.scyfall_models import PrintedCard
 router = APIRouter()
 
 
+def _expose_id(card: dict) -> dict:
+    """Rename an aggregated card's "_id" to "id".
+
+    Grouping by oracle_id forces the key onto "_id", which is a MongoDB
+    detail rather than part of this API. Every aggregated endpoint returns
+    "id" instead, matching what clients declare and expect.
+    """
+    if "_id" in card:
+        card["id"] = card.pop("_id")
+    return card
+
+
 class Card(PrintedCard):
     thumbnail: AnyUrl
     image: AnyUrl
@@ -69,9 +81,9 @@ def search_card_by_name(
     ]
 
     if len(results) == 0:
-        return None
+        raise HTTPException(status_code=404, detail=f"Card {name} not found")
 
-    return results[0]
+    return _expose_id(results[0])
 
 
 @router.get("/cards/search/{text}")
@@ -180,14 +192,18 @@ def search_card_by_text(
     results = list(collection.aggregate(pipeline))
 
     # Build pagination result
+    # One extra document was fetched purely to detect a further page.
+    page = [_expose_id(card) for card in results[:page_count]]
+    has_more = len(results) > page_count
+
+    # The cursor points at the last card of this page. Its "id" is the
+    # grouping key, which the pipeline's cursor filter matches as "_id".
     result = {
-        "cards": results[:page_count],
+        "cards": page,
         "cursor": (
-            f"{results[-2]['score']}:{results[-2]['_id']}"
-            if len(results) > page_count
-            else None
+            f"{page[-1]['score']}:{page[-1]['id']}" if has_more and page else None
         ),
-        "has_more": len(results) > page_count,
+        "has_more": has_more,
     }
 
     return result
@@ -247,3 +263,43 @@ def get_cards_by_oracle_id(oracle_id: str, collection: CardsCollection):
         )
 
     return cards
+
+
+@router.get("/cards/oracle/{oracle_id}/aggregated")
+def get_aggregated_card_by_oracle_id(oracle_id: str, collection: CardsCollection):
+    """Get a single card aggregated across all its printings, by Oracle ID.
+
+    /cards/oracle/{oracle_id} returns the raw printings. This returns the same
+    grouped shape that /cards/search/{text} produces for each result, so a
+    card can be rendered on its own from an Oracle ID alone rather than only
+    from a search result.
+
+    Args:
+        oracle_id: Oracle UUID representing the card concept
+        collection: MongoDB cards collection (injected dependency)
+
+    Returns:
+        Aggregated card data, including every printing under "cards"
+
+    Raises:
+        HTTPException: 404 if no cards found with this oracle_id
+    """
+
+    results = [
+        card
+        for card in collection.aggregate(
+            [
+                {"$match": {"oracle_id": oracle_id}},
+                {"$project": CARD_PROJECTION},
+                {"$sort": {"released_at": -1}},
+                {"$group": AGGREGATE_CARD},
+            ]
+        )
+    ]
+
+    if not results:
+        raise HTTPException(
+            status_code=404, detail=f"No cards found with Oracle ID {oracle_id}"
+        )
+
+    return _expose_id(results[0])

@@ -159,12 +159,12 @@ def assert_valid_aggregated_card(card: dict, context: str = "card") -> None:
     assert isinstance(card, dict), f"{context} must be a dict, got {type(card)}"
 
     # Required aggregation fields
-    required_fields = ["_id", "name", "card_count", "cards"]
+    required_fields = ["id", "name", "card_count", "cards"]
     for field in required_fields:
         assert field in card, f"{context} missing required field: {field}"
 
-    # Validate _id is a UUID (oracle_id)
-    assert_valid_uuid(card["_id"], f"{context}._id")
+    # Validate id is a UUID (the oracle_id this group was keyed on)
+    assert_valid_uuid(card["id"], f"{context}.id")
 
     # Validate name
     assert isinstance(card["name"], str), f"{context}.name must be a string"

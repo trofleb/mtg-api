@@ -169,8 +169,8 @@ def test_search_cursor_pagination(test_client):
         data2 = response2.json()
 
         # Verify no overlap - composite cursor should prevent duplicates
-        page1_ids = {card["_id"] for card in data1["cards"]}
-        page2_ids = {card["_id"] for card in data2["cards"]}
+        page1_ids = {card["id"] for card in data1["cards"]}
+        page2_ids = {card["id"] for card in data2["cards"]}
 
         overlap = page1_ids & page2_ids
         assert len(overlap) == 0, f"Found {len(overlap)} duplicate cards between pages"
@@ -232,7 +232,7 @@ def test_search_response_structure(test_client):
     # Verify card structure if results exist
     if len(data["cards"]) > 0:
         card = data["cards"][0]
-        assert "_id" in card  # Oracle ID
+        assert "id" in card  # Oracle ID
         assert "name" in card
         assert "cmc" in card
         assert "type_line" in card

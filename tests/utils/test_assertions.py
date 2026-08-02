@@ -166,7 +166,7 @@ class TestAssertValidSearchResponse:
         response = {
             "cards": [
                 {
-                    "_id": "550c74d4-a843-4208-a3c2-c71e84a21979",
+                    "id": "550c74d4-a843-4208-a3c2-c71e84a21979",
                     "name": "Lightning Bolt",
                     "card_count": 1,
                     "cards": [
@@ -218,7 +218,7 @@ class TestAssertValidAggregatedCard:
     def test_valid_aggregated_card_passes(self):
         """Valid aggregated card should not raise."""
         card = {
-            "_id": "550c74d4-a843-4208-a3c2-c71e84a21979",
+            "id": "550c74d4-a843-4208-a3c2-c71e84a21979",
             "name": "Lightning Bolt",
             "card_count": 2,
             "cards": [
@@ -237,7 +237,7 @@ class TestAssertValidAggregatedCard:
     def test_missing_field_raises(self):
         """Missing required field should raise AssertionError."""
         card = {
-            "_id": "550c74d4-a843-4208-a3c2-c71e84a21979",
+            "id": "550c74d4-a843-4208-a3c2-c71e84a21979",
             "name": "Lightning Bolt",
             # Missing card_count and cards
         }
@@ -247,7 +247,7 @@ class TestAssertValidAggregatedCard:
     def test_invalid_oracle_id_raises(self):
         """Invalid oracle_id (_id) should raise AssertionError."""
         card = {
-            "_id": "not-a-uuid",
+            "id": "not-a-uuid",
             "name": "Lightning Bolt",
             "card_count": 1,
             "cards": [{"id": "550c74d4-a843-4208-a3c2-c71e84a21979"}],
@@ -258,7 +258,7 @@ class TestAssertValidAggregatedCard:
     def test_mismatched_count_raises(self):
         """Mismatched card_count and cards length should raise AssertionError."""
         card = {
-            "_id": "550c74d4-a843-4208-a3c2-c71e84a21979",
+            "id": "550c74d4-a843-4208-a3c2-c71e84a21979",
             "name": "Lightning Bolt",
             "card_count": 5,  # Says 5 but only has 1
             "cards": [{"id": "550c74d4-a843-4208-a3c2-c71e84a21979"}],
@@ -269,7 +269,7 @@ class TestAssertValidAggregatedCard:
     def test_invalid_printing_id_raises(self):
         """Invalid printing ID should raise AssertionError."""
         card = {
-            "_id": "550c74d4-a843-4208-a3c2-c71e84a21979",
+            "id": "550c74d4-a843-4208-a3c2-c71e84a21979",
             "name": "Lightning Bolt",
             "card_count": 1,
             "cards": [{"id": "not-a-uuid"}],
