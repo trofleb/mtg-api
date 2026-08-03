@@ -149,6 +149,14 @@ test-e2e *args:
 test-e2e-ui:
     cd web-app && pnpm run test:e2e:ui
 
+# Run e2e tests against production (no local API or tunnel needed)
+test-e2e-prod *args:
+    cd web-app && pnpm run test:e2e:prod --reporter=list {{args}}
+
+# Interactive UI mode against production
+test-e2e-ui-prod:
+    cd web-app && pnpm run test:e2e:ui:prod
+
 # Debug mode with inspector
 test-e2e-debug:
     cd web-app && pnpm run test:e2e:debug

@@ -3,6 +3,17 @@ import { expect, test } from "@playwright/test";
 const API_BASE_URL = process.env.API_URL || "http://localhost:8000";
 
 test.describe("MTG API Endpoints", () => {
+  // These talk to the API directly, which only works where the API is
+  // reachable: a local stack, or a VPS tunnel that publishes it on
+  // localhost. Production deliberately does not expose it - the browser can
+  // only ever reach the Next.js server - so against a remote BASE_URL these
+  // would fail for the very reason the deployment is considered correct.
+  // Skip rather than fail, and say so, so a red run always means a real bug.
+  test.skip(
+    () => Boolean(process.env.BASE_URL) && !process.env.API_URL,
+    "API is not exposed publicly; set API_URL (e.g. via the VPS tunnel) to run these"
+  );
+
   test("should respond to ping endpoint", async ({ request }) => {
     const response = await request.get(`${API_BASE_URL}/ping`);
 

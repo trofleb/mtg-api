@@ -64,13 +64,19 @@ export default defineConfig({
     // },
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: {
-    command: process.env.CI ? "pnpm run build && pnpm run start" : "pnpm run dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  // Run a local dev server before starting the tests - but only when the
+  // tests are aimed at localhost. With BASE_URL pointing somewhere else
+  // (production, a preview deploy) there is nothing to boot, and starting a
+  // local server anyway wastes two minutes and, worse, silently serves the
+  // local build on :3000 while the assertions run against the remote host.
+  webServer: process.env.BASE_URL
+    ? undefined
+    : {
+        command: process.env.CI ? "pnpm run build && pnpm run start" : "pnpm run dev",
+        url: "http://localhost:3000",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120 * 1000,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
 });
