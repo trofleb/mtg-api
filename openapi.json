@@ -1,0 +1,1339 @@
+{
+  "components": {
+    "schemas": {
+      "Body_ocr_file_ocr__post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_ocr_file_ocr__post",
+        "type": "object"
+      },
+      "CardPrinting": {
+        "description": "A single printing of a card, shaped by ``CARD_PROJECTION``.\n\nOnly ``id`` and ``name`` are required: the projection asks for fields\nthat plenty of real cards simply do not carry (no watermark, no flavour\ntext, no images on a placeholder printing), and Mongo omits a projected\nfield entirely when the source is missing.",
+        "properties": {
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "cmc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cmc"
+          },
+          "color_identity": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "W",
+                    "U",
+                    "B",
+                    "R",
+                    "G"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color Identity"
+          },
+          "colors": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "W",
+                    "U",
+                    "B",
+                    "R",
+                    "G"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colors"
+          },
+          "faces_thumbnails": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faces Thumbnails"
+          },
+          "flavor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flavor Name"
+          },
+          "flavor_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flavor Text"
+          },
+          "games": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Games"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
+          },
+          "imageXL": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imagexl"
+          },
+          "image_uris": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Uris"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          },
+          "layout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "oracle_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oracle Id"
+          },
+          "oracle_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oracle Text"
+          },
+          "printed_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printed Name"
+          },
+          "promo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Promo"
+          },
+          "rarity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rarity"
+          },
+          "related_uris": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Related Uris"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "reprint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reprint"
+          },
+          "security_stamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Stamp"
+          },
+          "set": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set"
+          },
+          "set_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Name"
+          },
+          "thumbnail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail"
+          },
+          "type_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Line"
+          },
+          "variation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variation"
+          },
+          "variation_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variation Of"
+          },
+          "watermark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watermark"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "CardPrinting",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "OracleCard": {
+        "description": "A card aggregated across its printings, shaped by ``AGGREGATE_CARD``.\n\n``id`` is the oracle id the group was keyed on, and it is required. That\nis the one piece of strictness worth an outage: it is the value every\nclient builds a card URL from, and while it lived only in ``_expose_id``\nit was a convention rather than a contract. Declaring it required turns\na group with no oracle id - what a ``reversible_card`` layout produces,\nsince Scryfall puts the oracle id on each face instead of the card -\ninto a loud failure at the boundary instead of an empty ``href``.",
+        "properties": {
+          "card_count": {
+            "title": "Card Count",
+            "type": "integer"
+          },
+          "card_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Text"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/CardPrinting"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "cmc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cmc"
+          },
+          "colors": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "W",
+                    "U",
+                    "B",
+                    "R",
+                    "G"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colors"
+          },
+          "edhrec_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edhrec Rank"
+          },
+          "faces_thumbnails": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faces Thumbnails"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "penny_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penny Rank"
+          },
+          "rarity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rarity"
+          },
+          "thumbnail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail"
+          },
+          "type_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Line"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "card_count",
+          "cards"
+        ],
+        "title": "OracleCard",
+        "type": "object"
+      },
+      "SearchResponse": {
+        "description": "A page of search results plus the cursor that continues it.",
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResultCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cards",
+          "has_more"
+        ],
+        "title": "SearchResponse",
+        "type": "object"
+      },
+      "SearchResultCard": {
+        "description": "An :class:`OracleCard` carrying the relevance score that ranked it.\n\nOnly search produces a score, so it is declared here rather than on\n``OracleCard``: the aggregated endpoint should not advertise a field it\nnever returns. The score is also what the pagination cursor is built\nfrom, which makes it worth exposing rather than hiding.",
+        "properties": {
+          "card_count": {
+            "title": "Card Count",
+            "type": "integer"
+          },
+          "card_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Text"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/CardPrinting"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "cmc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cmc"
+          },
+          "colors": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "W",
+                    "U",
+                    "B",
+                    "R",
+                    "G"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colors"
+          },
+          "edhrec_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edhrec Rank"
+          },
+          "faces_thumbnails": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faces Thumbnails"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "penny_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penny Rank"
+          },
+          "rarity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rarity"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "thumbnail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail"
+          },
+          "type_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Line"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "card_count",
+          "cards"
+        ],
+        "title": "SearchResultCard",
+        "type": "object"
+      },
+      "Sets": {
+        "properties": {
+          "sets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sets"
+        ],
+        "title": "Sets",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "FastAPI",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/cards/id/{scryfall_id}": {
+      "get": {
+        "description": "Get a specific MTG card printing by Scryfall ID.\n\nArgs:\n    scryfall_id: Unique Scryfall UUID for a specific card printing\n    collection: MongoDB cards collection (injected dependency)\n\nReturns:\n    Card data including image_uris and all metadata\n\nRaises:\n    HTTPException: 404 if card not found",
+        "operationId": "get_card_by_scryfall_id_cards_id__scryfall_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scryfall_id",
+            "required": true,
+            "schema": {
+              "title": "Scryfall Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardPrinting"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Card By Scryfall Id"
+      }
+    },
+    "/cards/oracle/{oracle_id}": {
+      "get": {
+        "description": "Get all printings of a card by Oracle ID.\n\nArgs:\n    oracle_id: Oracle UUID representing the card concept (non-unique)\n    collection: MongoDB cards collection (injected dependency)\n\nReturns:\n    List of all card printings sharing this oracle_id\n\nRaises:\n    HTTPException: 404 if no cards found with this oracle_id",
+        "operationId": "get_cards_by_oracle_id_cards_oracle__oracle_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "oracle_id",
+            "required": true,
+            "schema": {
+              "title": "Oracle Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardPrinting"
+                  },
+                  "title": "Response Get Cards By Oracle Id Cards Oracle  Oracle Id  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cards By Oracle Id"
+      }
+    },
+    "/cards/oracle/{oracle_id}/aggregated": {
+      "get": {
+        "description": "Get a single card aggregated across all its printings, by Oracle ID.\n\n/cards/oracle/{oracle_id} returns the raw printings. This returns the same\ngrouped shape that /cards/search/{text} produces for each result, so a\ncard can be rendered on its own from an Oracle ID alone rather than only\nfrom a search result.\n\nArgs:\n    oracle_id: Oracle UUID representing the card concept\n    collection: MongoDB cards collection (injected dependency)\n\nReturns:\n    Aggregated card data, including every printing under \"cards\"\n\nRaises:\n    HTTPException: 404 if no cards found with this oracle_id",
+        "operationId": "get_aggregated_card_by_oracle_id_cards_oracle__oracle_id__aggregated_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "oracle_id",
+            "required": true,
+            "schema": {
+              "title": "Oracle Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OracleCard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Aggregated Card By Oracle Id"
+      }
+    },
+    "/cards/search/{text}": {
+      "get": {
+        "operationId": "search_card_by_text_cards_search__text__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "text",
+            "required": true,
+            "schema": {
+              "title": "Text",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "default": "en",
+              "title": "Lang",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_count",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "title": "Page Count",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sets",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Sets",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "colors",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Colors",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "color_operator",
+            "required": false,
+            "schema": {
+              "default": "or",
+              "title": "Color Operator",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cmc_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cmc Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cmc_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cmc Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "types",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Types",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rarities",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Rarities",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Card By Text"
+      }
+    },
+    "/cards/{name}": {
+      "get": {
+        "operationId": "search_card_by_name_cards__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "required": false,
+            "schema": {
+              "default": "en",
+              "title": "Lang",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OracleCard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Card By Name"
+      }
+    },
+    "/dnd/ruling/{question}": {
+      "get": {
+        "operationId": "read_root_dnd_ruling__question__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "title": "Question",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paragraph_counts",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "Paragraph Counts",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Root"
+      }
+    },
+    "/mtg/ruling/{question}": {
+      "get": {
+        "operationId": "read_root_mtg_ruling__question__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question",
+            "required": true,
+            "schema": {
+              "title": "Question",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "paragraph_counts",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "Paragraph Counts",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Root"
+      }
+    },
+    "/ocr/": {
+      "post": {
+        "operationId": "ocr_file_ocr__post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_ocr_file_ocr__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ocr File"
+      }
+    },
+    "/ping": {
+      "get": {
+        "operationId": "read_root_ping_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Root"
+      }
+    },
+    "/sets": {
+      "get": {
+        "description": "Get all unique MTG set names.\n\nArgs:\n    collection: MongoDB cards collection (injected dependency)\n\nReturns:\n    Sets object containing list of unique set names.",
+        "operationId": "get_sets_sets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Sets"
+      }
+    }
+  }
+}

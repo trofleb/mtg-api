@@ -139,7 +139,7 @@ export function CardDetails({ card }: CardDetailsProps) {
                       <div className="relative w-16 h-22 flex-shrink-0">
                         <Image
                           src={printing.image_uris.small}
-                          alt={printing.set_name}
+                          alt={printing.set_name ?? printing.name}
                           fill
                           className="object-contain rounded"
                           sizes="64px"
@@ -148,9 +148,11 @@ export function CardDetails({ card }: CardDetailsProps) {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{printing.set_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Set: {printing.set.toUpperCase()}
-                      </p>
+                      {printing.set && (
+                        <p className="text-xs text-muted-foreground">
+                          Set: {printing.set.toUpperCase()}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Released: {printing.released_at}
                       </p>

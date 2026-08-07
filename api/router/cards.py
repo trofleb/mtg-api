@@ -2,12 +2,11 @@ from typing import Annotated, Optional
 
 from fastapi import HTTPException, Query
 from fastapi.routing import APIRouter
-from pydantic import AnyUrl
 from unidecode import unidecode
 
 from api.helpers.cards_mongo import AGGREGATE_CARD, CARD_PROJECTION
 from api.helpers.database import CardsCollection
-from common.scyfall_models import PrintedCard
+from api.models.cards import CardPrinting, OracleCard, SearchResponse
 
 router = APIRouter()
 
@@ -16,36 +15,16 @@ def _expose_id(card: dict) -> dict:
     """Rename an aggregated card's "_id" to "id".
 
     Grouping by oracle_id forces the key onto "_id", which is a MongoDB
-    detail rather than part of this API. Every aggregated endpoint returns
-    "id" instead, matching what clients declare and expect.
+    detail rather than part of this API. The OracleCard response model
+    declares "id" and requires it, so this is now how the pipeline meets
+    that contract rather than being the contract itself.
     """
     if "_id" in card:
         card["id"] = card.pop("_id")
     return card
 
 
-class Card(PrintedCard):
-    thumbnail: AnyUrl
-    image: AnyUrl
-    imageXL: AnyUrl
-
-
-class OracleCard:
-    id: str
-    name: str
-    card_text: str
-    set_count: int
-    thumbnail: str
-    card_count: str
-    edhrec_rank: int
-    penny_rank: int
-    cards: list[Card]
-
-
-# Removed CardFilter BaseModel - using individual Annotated parameters instead
-
-
-@router.get("/cards/{name}")
+@router.get("/cards/{name}", response_model=OracleCard)
 def search_card_by_name(
     name: str,
     collection: CardsCollection,
@@ -86,7 +65,7 @@ def search_card_by_name(
     return _expose_id(results[0])
 
 
-@router.get("/cards/search/{text}")
+@router.get("/cards/search/{text}", response_model=SearchResponse)
 def search_card_by_text(
     text: str,
     collection: CardsCollection,
@@ -209,7 +188,7 @@ def search_card_by_text(
     return result
 
 
-@router.get("/cards/id/{scryfall_id}")
+@router.get("/cards/id/{scryfall_id}", response_model=CardPrinting)
 def get_card_by_scryfall_id(scryfall_id: str, collection: CardsCollection):
     """Get a specific MTG card printing by Scryfall ID.
 
@@ -235,7 +214,7 @@ def get_card_by_scryfall_id(scryfall_id: str, collection: CardsCollection):
     return card
 
 
-@router.get("/cards/oracle/{oracle_id}")
+@router.get("/cards/oracle/{oracle_id}", response_model=list[CardPrinting])
 def get_cards_by_oracle_id(oracle_id: str, collection: CardsCollection):
     """Get all printings of a card by Oracle ID.
 
@@ -265,7 +244,7 @@ def get_cards_by_oracle_id(oracle_id: str, collection: CardsCollection):
     return cards
 
 
-@router.get("/cards/oracle/{oracle_id}/aggregated")
+@router.get("/cards/oracle/{oracle_id}/aggregated", response_model=OracleCard)
 def get_aggregated_card_by_oracle_id(oracle_id: str, collection: CardsCollection):
     """Get a single card aggregated across all its printings, by Oracle ID.
 

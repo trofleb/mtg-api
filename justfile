@@ -43,7 +43,7 @@ dev: install-dev
     @echo "Run 'just docker-up' in another terminal for services"
     just dev-api
 
-ci: format-check lint test
+ci: format-check lint openapi-check test
     @echo "✅ CI checks passed"
 
 # Docker development
@@ -191,6 +191,20 @@ pre-commit:
 # Type checking (if mypy is added later)
 types:
     @echo "Type checking not configured yet - add mypy to dev dependencies"
+
+# API contract
+# Regenerate the committed openapi.json from this checkout's code.
+# Needs no database: api.main opens no connection at import time.
+openapi:
+    uv run python scripts/generate_openapi.py
+
+# Fail if the committed openapi.json no longer matches the API.
+openapi-check:
+    uv run python scripts/generate_openapi.py --check
+
+# Regenerate the web app's TypeScript types from the committed document.
+openapi-types: openapi
+    cd web-app && pnpm run generate:api-types
 
 # Scripts
 mtg-events *args:

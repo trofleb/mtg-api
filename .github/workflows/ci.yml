@@ -32,8 +32,15 @@ jobs:
               - 'pyproject.toml'
               - 'uv.lock'
               - '.github/workflows/ci.yml'
+              # Both are needed for the staleness gate below to be unbypassable.
+              # Without them a commit touching only openapi.json skips this job,
+              # so generate_openapi.py --check never runs -- and the web-app job
+              # then regenerates its types from the tampered document and passes.
+              - 'openapi.json'
+              - 'scripts/**'
             web-app:
               - 'web-app/**'
+              - 'openapi.json'
               - '.github/workflows/ci.yml'
             scripts:
               - 'scripts/**'
@@ -67,6 +74,13 @@ jobs:
 
       - name: Format check
         run: uv run ruff format --check --exclude "notebooks/**" .
+
+      # The committed openapi.json is what the web app generates its types
+      # and its request stub from, so a stale one is a contract describing an
+      # API that no longer exists. Regenerate from this PR's code and fail on
+      # any difference.
+      - name: Check the committed OpenAPI document is current
+        run: uv run python scripts/generate_openapi.py --check
 
       - name: Test
         run: uv run pytest --cov --cov-report=xml
@@ -116,6 +130,15 @@ jobs:
       - name: Lint
         working-directory: web-app
         run: pnpm run check
+
+      # lib/api-types.ts is generated from the committed openapi.json. It is
+      # committed too, so tsc has a schema on a frontend-only PR where the
+      # backend job never runs - which only holds if the two stay in step.
+      - name: Check the generated API types are current
+        working-directory: web-app
+        run: |
+          pnpm run generate:api-types
+          git diff --exit-code lib/api-types.ts
 
       - name: Type check
         working-directory: web-app
