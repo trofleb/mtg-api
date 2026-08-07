@@ -5,11 +5,94 @@ collection classes, enabling fast integration tests without external dependencie
 
 Supports MongoDB query operators: $regex, $in, $nin, $all, $size, $gte, $lte, $text, $search, $or, $and, $exists, $eq
 Supports aggregation stages: $match, $project, $group, $sort, $limit
+Supports projection expressions: {"$meta": "textScore"}
+
+Deliberate fidelity choices, so tests cannot pass for the wrong reason:
+
+- ``{"$project": {"score": 1}}`` projects the document's own ``score`` field.
+  Card documents have none, so the field comes back absent -- exactly as in
+  MongoDB. Only ``{"$meta": "textScore"}`` produces a relevance score.
+- ``$max`` over a field no document carries yields ``None``, not an absent
+  field, so ``f"{score}:{id}"`` cursors read ``"None:<id>"`` as in production.
+- ``$sort`` never raises on ``None`` or mixed types; it orders them the way
+  BSON does (null first ascending).
 """
 
 import re
 from copy import deepcopy
 from typing import Any, Optional
+
+# Relative field weights of the mock text index. The card name dominates, as
+# in a MongoDB text index whose `name` field carries the highest weight.
+_TEXT_FIELD_WEIGHTS = {
+    "name": 10.0,
+    "printed_name": 8.0,
+    "type_line": 3.0,
+    "oracle_text": 1.0,
+    "flavor_text": 0.5,
+    "set_name": 0.5,
+}
+
+_WORD_RE = re.compile(r"[\w']+")
+
+
+def _tokenize(value: Any) -> list[str]:
+    """Split a value into lowercase word tokens.
+
+    Args:
+        value: Any value; non-strings are stringified first.
+
+    Returns:
+        List of lowercase word tokens.
+    """
+    if value is None:
+        return []
+    return _WORD_RE.findall(str(value).lower())
+
+
+def _sort_key(value: Any) -> tuple[int, Any]:
+    """Build a total-order sort key mirroring BSON type ordering.
+
+    MongoDB sorts null before numbers before strings and never raises on
+    mixed types, while plain Python comparison would.
+
+    Args:
+        value: Field value to build a key for.
+
+    Returns:
+        (type rank, comparable value) tuple.
+    """
+    if value is None:
+        return (0, 0)
+    if isinstance(value, bool):
+        return (3, value)
+    if isinstance(value, (int, float)):
+        return (1, value)
+    if isinstance(value, str):
+        return (2, value)
+    return (4, str(value))
+
+
+def _extract_search_text(query: Optional[dict]) -> Optional[str]:
+    """Find the $text search string in a query, recursing into $or/$and.
+
+    Args:
+        query: MongoDB query dictionary.
+
+    Returns:
+        The $search string, or None when the query has no $text clause.
+    """
+    if not isinstance(query, dict):
+        return None
+    for field, condition in query.items():
+        if field == "$text" and isinstance(condition, dict):
+            return condition.get("$search")
+        if field in ("$or", "$and") and isinstance(condition, list):
+            for sub_query in condition:
+                found = _extract_search_text(sub_query)
+                if found is not None:
+                    return found
+    return None
 
 
 class MockMongoCursor:
@@ -35,7 +118,7 @@ class MockMongoCursor:
             Self for method chaining.
         """
         reverse = direction == -1
-        self._documents.sort(key=lambda doc: doc.get(field, ""), reverse=reverse)
+        self._documents.sort(key=lambda doc: _sort_key(doc.get(field)), reverse=reverse)
         return self
 
     def limit(self, count: int) -> "MockMongoCursor":
@@ -88,11 +171,10 @@ class MockMongoCollection:
         Returns:
             Matching document or None.
         """
+        self._last_search_text = _extract_search_text(query)
         for doc in self._documents:
             if self._matches_query(doc, query):
-                if projection:
-                    return self._apply_projection(doc, projection)
-                return deepcopy(doc)
+                return self._project(doc, projection)
         return None
 
     def find(self, query: dict, projection: Optional[dict] = None) -> MockMongoCursor:
@@ -105,13 +187,12 @@ class MockMongoCollection:
         Returns:
             MockMongoCursor with matching documents.
         """
-        matching_docs = []
-        for doc in self._documents:
-            if self._matches_query(doc, query):
-                if projection:
-                    matching_docs.append(self._apply_projection(doc, projection))
-                else:
-                    matching_docs.append(deepcopy(doc))
+        self._last_search_text = _extract_search_text(query)
+        matching_docs = [
+            self._project(doc, projection)
+            for doc in self._documents
+            if self._matches_query(doc, query)
+        ]
         return MockMongoCursor(matching_docs)
 
     def aggregate(self, pipeline: list[dict]) -> MockMongoCursor:
@@ -123,6 +204,9 @@ class MockMongoCollection:
         Returns:
             MockMongoCursor with aggregation results.
         """
+        # Each pipeline is self-contained: a $text query from an earlier call
+        # must not silently score this one.
+        self._last_search_text = None
         documents = deepcopy(self._documents)
 
         for stage in pipeline:
@@ -156,11 +240,11 @@ class MockMongoCollection:
                 ):
                     return False
             elif field == "$text":
-                # Text search - simple implementation
-                search_text = condition.get("$search", "").lower()
-                self._last_search_text = search_text  # Save for scoring
+                # Text search: MongoDB matches a document carrying ANY of the
+                # query terms, so a multi-word query is not a phrase match.
+                terms = _tokenize(condition.get("$search", ""))
                 doc_text = str(doc).lower()
-                if search_text not in doc_text:
+                if terms and not any(term in doc_text for term in terms):
                     return False
             elif isinstance(condition, dict):
                 # Field with operators
@@ -220,6 +304,60 @@ class MockMongoCollection:
 
         return True
 
+    def _project(self, doc: dict, projection: Optional[dict]) -> dict:
+        """Project a document, resolving any {"$meta": ...} expressions.
+
+        Args:
+            doc: Document to project.
+            projection: Projection dictionary, possibly with $meta fields.
+
+        Returns:
+            Projected document.
+        """
+        if not projection:
+            return deepcopy(doc)
+
+        meta_fields = {
+            field: spec["$meta"]
+            for field, spec in projection.items()
+            if isinstance(spec, dict) and "$meta" in spec
+        }
+        plain = {
+            field: spec
+            for field, spec in projection.items()
+            if field not in meta_fields
+        }
+
+        result = self._apply_projection(doc, plain)
+        for field, meta_kind in meta_fields.items():
+            result[field] = self._resolve_meta(meta_kind, doc)
+        return result
+
+    def _resolve_meta(self, meta_kind: str, doc: dict) -> float:
+        """Resolve a $meta expression for a document.
+
+        Args:
+            meta_kind: The $meta keyword, e.g. "textScore".
+            doc: Source document.
+
+        Returns:
+            The metadata value.
+
+        Raises:
+            ValueError: For unsupported keywords, or for "textScore" when the
+                query ran no $text search -- MongoDB errors there too.
+        """
+        if meta_kind != "textScore":
+            raise ValueError(
+                f"MockMongoCollection does not support $meta {meta_kind!r}"
+            )
+        if self._last_search_text is None:
+            raise ValueError(
+                'query requires "textScore" metadata, '
+                "but no $text search ran in this query"
+            )
+        return self._calculate_text_score(doc, self._last_search_text)
+
     def _apply_projection(self, doc: dict, projection: dict) -> dict:
         """Apply projection to document.
 
@@ -272,77 +410,33 @@ class MockMongoCollection:
         stage_spec = stage[stage_type]
 
         if stage_type == "$match":
-            # Filter documents
+            # Remember any $text query so a later $meta stage can score it.
+            # Read from the query itself, not from matched documents, so an
+            # empty collection still knows a text search ran.
+            self._last_search_text = (
+                _extract_search_text(stage_spec) or self._last_search_text
+            )
             return [doc for doc in documents if self._matches_query(doc, stage_spec)]
 
         elif stage_type == "$project":
-            # Project fields with optional score calculation
-            projected = []
-            for doc in documents:
-                projected_doc = self._apply_projection(doc, stage_spec)
-
-                # Add text search score if requested
-                if stage_spec.get("score") == 1 and self._last_search_text:
-                    projected_doc["score"] = self._calculate_text_score(
-                        doc, self._last_search_text
-                    )
-
-                projected.append(projected_doc)
-            return projected
+            # A plain {"field": 1} projects the document's own field; only
+            # {"$meta": "textScore"} produces a relevance score.
+            return [self._project(doc, stage_spec) for doc in documents]
 
         elif stage_type == "$group":
             # Group documents
             return self._execute_group_stage(documents, stage_spec)
 
         elif stage_type == "$sort":
-            # Sort documents (supports multiple sort fields)
-            sort_fields = list(stage_spec.items())
-
-            def sort_key(doc):
-                # Return tuple of values for multi-field sort
-                return tuple(doc.get(field, "") for field, _ in sort_fields)
-
-            # Sort in reverse if first field is descending
-            # Multi-field sort with mixed directions needs custom comparison
-            if len(sort_fields) == 1:
-                field, direction = sort_fields[0]
-                return sorted(
-                    documents,
-                    key=lambda doc: doc.get(field, ""),
+            # Stable sort, least significant field first: this supports mixed
+            # directions and never compares incompatible types directly.
+            ordered = list(documents)
+            for field, direction in reversed(list(stage_spec.items())):
+                ordered.sort(
+                    key=lambda doc, field=field: _sort_key(doc.get(field)),
                     reverse=(direction == -1),
                 )
-            else:
-                # Multi-field sort: use tuple comparison
-                def multi_sort_key(doc):
-                    values = []
-                    for field, direction in sort_fields:
-                        val = doc.get(field, "")
-                        # Negate numeric values for descending sort
-                        if direction == -1 and isinstance(val, (int, float)):
-                            val = -val
-                        elif direction == -1:
-                            # For strings, can't negate, so we'll handle in reverse
-                            pass
-                        values.append((direction, val))
-                    return values
-
-                # Custom comparator for mixed direction sorts
-                from functools import cmp_to_key
-
-                def compare(a, b):
-                    a_vals = multi_sort_key(a)
-                    b_vals = multi_sort_key(b)
-                    for (dir_a, val_a), (dir_b, val_b) in zip(a_vals, b_vals):
-                        if val_a < val_b:
-                            result = -1
-                        elif val_a > val_b:
-                            result = 1
-                        else:
-                            continue
-                        return result * dir_a  # Apply direction
-                    return 0
-
-                return sorted(documents, key=cmp_to_key(compare))
+            return ordered
 
         elif stage_type == "$limit":
             # Limit documents
@@ -414,12 +508,13 @@ class MockMongoCollection:
                             acc_value[1:] if acc_value.startswith("$") else acc_value
                         )
                         current_value = doc.get(field_name)
-                        if current_value is not None:
-                            if (
-                                field not in groups[key]
-                                or current_value > groups[key][field]
-                            ):
-                                groups[key][field] = current_value
+                        # MongoDB emits null when no document carries a value,
+                        # rather than omitting the field.
+                        best = groups[key].setdefault(field, None)
+                        if current_value is not None and (
+                            best is None or _sort_key(current_value) > _sort_key(best)
+                        ):
+                            groups[key][field] = current_value
 
                     elif acc_type == "$addToSet":
                         if field not in groups[key]:
@@ -440,34 +535,38 @@ class MockMongoCollection:
         return list(groups.values())
 
     def _calculate_text_score(self, doc: dict, search_text: str) -> float:
-        """Calculate mock text search score for pagination testing.
+        """Calculate a deterministic mock of MongoDB's $text relevance score.
 
-        Simulates MongoDB $text search score based on text relevance.
-        Higher scores indicate better matches. Uses deterministic scoring
-        for reproducible tests.
+        Each weighted field contributes term *density* (how much of the field
+        the query terms cover) times term *coverage* (how many of the query's
+        terms the field matches). So a card whose whole name is the query
+        outscores one that merely mentions a term, and documents of differing
+        relevance get differing scores -- which is what makes ordering by the
+        score observable through $sort.
+
+        Two documents with identical relevance profiles score identically,
+        as they would in MongoDB.
 
         Args:
-            doc: Document to score
-            search_text: Search query text
+            doc: Document to score.
+            search_text: Search query text.
 
         Returns:
-            Score between 0.0 and 1.0
+            Non-negative relevance score; 0.0 when nothing matches.
         """
-        if not search_text:
-            return 0.5  # Default score
+        terms = _tokenize(search_text)
+        if not terms:
+            return 0.0
 
-        name = doc.get("name", "").lower()
-        oracle_text = doc.get("oracle_text", "").lower()
-        search = search_text.lower()
+        score = 0.0
+        for field, weight in _TEXT_FIELD_WEIGHTS.items():
+            words = _tokenize(doc.get(field))
+            if not words:
+                continue
+            hits = sum(1 for word in words for term in terms if term in word)
+            if not hits:
+                continue
+            matched = sum(1 for term in terms if any(term in word for word in words))
+            score += weight * (hits / len(words)) * (matched / len(terms))
 
-        # Scoring rules (deterministic for testing):
-        if search == name:
-            return 1.0  # Perfect match
-        elif name.startswith(search):
-            return 0.9  # Prefix match
-        elif search in name:
-            return 0.8  # Substring match in name
-        elif search in oracle_text:
-            return 0.6  # Match in card text
-        else:
-            return 0.3  # Weak/generic match
+        return round(score, 6)

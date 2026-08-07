@@ -4,6 +4,8 @@ This module tests MockMongoCursor and MockMongoCollection to ensure they
 correctly simulate MongoDB operations for integration testing.
 """
 
+from typing import Optional
+
 import pytest
 
 from tests.mocks.mongodb import MockMongoCollection, MockMongoCursor
@@ -410,109 +412,251 @@ def test_size_and_all_operators_combined():
     assert "Progenitus" not in names
 
 
-@pytest.mark.unit
-def test_text_search_score_in_aggregation():
-    """Test that text search score is added to $project stage.
+# Cards with deliberately different relevance profiles for the query
+# "lightning bolt". Their _id values sort in the *reverse* of their relevance
+# order, so a test can tell real score ordering apart from an _id fallback.
+RELEVANCE_CARDS = [
+    {
+        # Exact name match: both query terms fill the whole name field.
+        "_id": "id-4",
+        "name": "Lightning Bolt",
+        "type_line": "Instant",
+        "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+    },
+    {
+        # One term in a two-word name, short oracle text.
+        "_id": "id-3",
+        "name": "Chain Lightning",
+        "type_line": "Sorcery",
+        "oracle_text": "Chain Lightning deals 3 damage to any target.",
+    },
+    {
+        # One term in a three-word name, long oracle text: lower density.
+        "_id": "id-2",
+        "name": "Lightning-Rig Crew",
+        "type_line": "Creature — Goblin",
+        "oracle_text": (
+            "Whenever an instant or sorcery spell is cast, "
+            "Lightning-Rig Crew deals 1 damage to each opponent."
+        ),
+    },
+    {
+        # No name match at all: hits only the low-weighted flavor text.
+        "_id": "id-1",
+        "name": "Shock",
+        "type_line": "Instant",
+        "oracle_text": "Shock deals 2 damage to any target.",
+        "flavor_text": "A bolt of lightning from a cloudless sky.",
+    },
+]
 
-    This validates:
-    - $text search stores search query for scoring
-    - $project with score:1 adds calculated score
-    - Score is deterministic based on match quality
-    - Score simulation is ready for pagination testing
-    """
-    # Add oracle_text field to sample data for scoring
-    cards_with_text = [
-        {
-            "id": "1",
-            "name": "Lightning Bolt",
-            "oracle_text": "Lightning Bolt deals 3 damage to any target.",
-            "cmc": 1.0,
-        },
-        {
-            "id": "2",
-            "name": "Counterspell",
-            "oracle_text": "Counter target spell.",
-            "cmc": 2.0,
-        },
-        {
-            "id": "3",
-            "name": "Lightning Strike",
-            "oracle_text": "Lightning Strike deals 3 damage to any target.",
-            "cmc": 2.0,
-        },
+# Relevance order for the query "lightning bolt", most relevant first.
+EXPECTED_RELEVANCE_ORDER = [
+    "Lightning Bolt",
+    "Chain Lightning",
+    "Lightning-Rig Crew",
+    "Shock",
+]
+
+
+def _text_score_pipeline(search: str, sort: Optional[dict] = None) -> list[dict]:
+    """Build a pipeline that projects a real textScore, like the search route."""
+    pipeline: list[dict] = [
+        {"$match": {"$text": {"$search": search}}},
+        {"$project": {"score": {"$meta": "textScore"}, "name": 1, "_id": 1}},
     ]
-    collection = MockMongoCollection(cards_with_text)
-
-    pipeline = [
-        {"$match": {"$text": {"$search": "lightning"}}},
-        {"$project": {"score": 1, "name": 1, "cmc": 1}},
-    ]
-
-    results = list(collection.aggregate(pipeline))
-
-    # Should find cards matching "lightning"
-    assert len(results) >= 2  # Lightning Bolt and Lightning Strike
-
-    # All results should have score field
-    assert all("score" in r for r in results)
-
-    # Scores should be > 0
-    assert all(r["score"] > 0.0 for r in results)
-
-    # Both cards should score 0.9 (name starts with "lightning")
-    bolt = next((r for r in results if r["name"] == "Lightning Bolt"), None)
-    assert bolt is not None
-    assert bolt["score"] == 0.9  # Prefix match
-
-    # Lightning Strike should also score 0.9 (starts with "lightning")
-    strike = next((r for r in results if r["name"] == "Lightning Strike"), None)
-    assert strike is not None
-    assert strike["score"] == 0.9  # Prefix match
+    if sort is not None:
+        pipeline.append({"$sort": sort})
+    return pipeline
 
 
 @pytest.mark.unit
-def test_text_search_score_sorting():
-    """Test that text search scores can be used for sorting (pagination).
+def test_project_meta_text_score_projects_a_score():
+    """$project with {"$meta": "textScore"} must project a numeric score.
 
-    This validates:
-    - Scores can be sorted descending (highest first)
-    - Score-based pagination is supported
-    - Deterministic scoring for reproducible tests
+    This is the capability the search route needs (issue #21): without it a
+    relevance test cannot distinguish {"score": 1} from a real text score.
     """
-    cards_with_text = [
-        {"id": "1", "name": "Lightning Bolt", "oracle_text": "deals damage"},
-        {"id": "2", "name": "Lightning Strike", "oracle_text": "deals damage"},
-        {"id": "3", "name": "Chain Lightning", "oracle_text": "deals damage"},
-        {"id": "4", "name": "Shock", "oracle_text": "lightning fast"},
-    ]
-    collection = MockMongoCollection(cards_with_text)
+    collection = MockMongoCollection(RELEVANCE_CARDS)
 
-    pipeline = [
-        {"$match": {"$text": {"$search": "lightning"}}},
-        {"$project": {"score": 1, "name": 1}},
-        {"$sort": {"score": -1}},  # Sort by score descending
-    ]
+    results = list(collection.aggregate(_text_score_pipeline("lightning bolt")))
 
-    results = list(collection.aggregate(pipeline))
+    assert len(results) == len(RELEVANCE_CARDS)
+    assert all("score" in card for card in results), (
+        f"$meta textScore projected no score: {results}"
+    )
+    assert all(isinstance(card["score"], float) for card in results)
+    assert all(card["score"] > 0.0 for card in results)
 
-    # Verify sorting: higher scores first
-    assert len(results) >= 3
 
-    # Lightning Bolt should be first (score=0.9, prefix match)
-    # Lightning Strike should be second (score=0.9, prefix match)
-    # Chain Lightning should be third (score=0.8, substring match)
-    # Shock should be last (score=0.6, text match only)
+@pytest.mark.unit
+def test_meta_text_score_differs_per_document():
+    """Scores must vary with relevance, not be a constant.
 
-    # First two can be in any order (both score 0.9)
-    first_two = results[:2]
-    first_two_names = {r["name"] for r in first_two}
-    assert "Lightning Bolt" in first_two_names
-    assert "Lightning Strike" in first_two_names
-    assert all(r["score"] == 0.9 for r in first_two)
+    A constant score would make a relevance test meaningless because $sort
+    would silently fall back to the tie-breaker field.
+    """
+    collection = MockMongoCollection(RELEVANCE_CARDS)
 
-    assert results[2]["name"] == "Chain Lightning"
-    assert results[2]["score"] == 0.8
+    results = list(collection.aggregate(_text_score_pipeline("lightning bolt")))
+    scores = [card["score"] for card in results]
 
-    # Verify scores are in descending order
-    scores = [r["score"] for r in results]
+    assert len(set(scores)) == len(scores), f"scores are not distinct: {scores}"
+
+
+@pytest.mark.unit
+def test_meta_text_score_ranks_exact_name_match_highest():
+    """The card whose name is exactly the query must score highest."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(collection.aggregate(_text_score_pipeline("lightning bolt")))
+    by_name = {card["name"]: card["score"] for card in results}
+
+    others = [score for name, score in by_name.items() if name != "Lightning Bolt"]
+    assert all(by_name["Lightning Bolt"] > score for score in others), by_name
+
+
+@pytest.mark.unit
+def test_sort_orders_documents_by_meta_projected_score():
+    """$sort on a $meta-projected score must actually order documents.
+
+    Branch 2 depends on this: the score has to drive the ordering, not the
+    _id tie-breaker. RELEVANCE_CARDS' _ids sort in the reverse order, so an
+    _id fallback cannot pass this test by accident.
+    """
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(
+        collection.aggregate(
+            _text_score_pipeline("lightning bolt", sort={"score": -1, "_id": 1})
+        )
+    )
+
+    assert [card["name"] for card in results] == EXPECTED_RELEVANCE_ORDER
+    scores = [card["score"] for card in results]
     assert scores == sorted(scores, reverse=True)
+
+
+@pytest.mark.unit
+def test_project_score_one_does_not_invent_a_score():
+    """{"$project": {"score": 1}} must not fabricate a score.
+
+    MongoDB projects the document's own `score` field; card documents have
+    none, so the field is simply absent. The mock must reproduce that or a
+    test for issue #21 passes whether or not the bug is fixed.
+    """
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    pipeline = [
+        {"$match": {"$text": {"$search": "lightning bolt"}}},
+        {"$project": {"score": 1, "name": 1}},
+    ]
+    results = list(collection.aggregate(pipeline))
+
+    assert len(results) == len(RELEVANCE_CARDS)
+    assert all("score" not in card for card in results), (
+        f"mock invented a score for a plain inclusion projection: {results}"
+    )
+
+
+@pytest.mark.unit
+def test_project_score_one_keeps_a_stored_score():
+    """A document that really has a `score` field keeps it."""
+    collection = MockMongoCollection([{"_id": "1", "name": "Shock", "score": 4.25}])
+
+    results = list(collection.aggregate([{"$project": {"score": 1, "name": 1}}]))
+
+    assert results[0]["score"] == 4.25
+
+
+@pytest.mark.unit
+def test_group_max_of_absent_score_is_none():
+    """$max over a field no document has yields null, as MongoDB does.
+
+    This is what makes issue #21's broken cursor observable: the route emits
+    f"{score}:{id}" and so produces the literal string "None:<id>".
+    """
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    pipeline = [
+        {"$match": {"$text": {"$search": "lightning bolt"}}},
+        {"$project": {"score": 1, "name": 1, "_id": 1}},
+        {"$group": {"_id": "$_id", "score": {"$max": "$score"}}},
+    ]
+    results = list(collection.aggregate(pipeline))
+
+    assert all("score" in group for group in results)
+    assert all(group["score"] is None for group in results)
+
+
+@pytest.mark.unit
+def test_sort_on_null_score_falls_back_to_id_order():
+    """Sorting by a null score must not raise and degenerates to _id order.
+
+    This is the production behaviour of issue #21, and the mock has to model
+    it rather than crash, so the bug is observable end to end.
+    """
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    pipeline = [
+        {"$match": {"$text": {"$search": "lightning bolt"}}},
+        {"$project": {"score": 1, "name": 1, "_id": 1}},
+        {
+            "$group": {
+                "_id": "$_id",
+                "name": {"$first": "$name"},
+                "score": {"$max": "$score"},
+            }
+        },
+        {"$sort": {"score": -1, "_id": 1}},
+    ]
+    results = list(collection.aggregate(pipeline))
+
+    assert [group["_id"] for group in results] == ["id-1", "id-2", "id-3", "id-4"]
+    # Reverse of the relevance order: no ranking happened at all.
+    assert [group["name"] for group in results] == EXPECTED_RELEVANCE_ORDER[::-1]
+
+
+@pytest.mark.unit
+def test_meta_text_score_requires_a_text_query():
+    """$meta textScore without a $text query is an error, as in MongoDB."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    with pytest.raises(ValueError, match="textScore"):
+        list(collection.aggregate([{"$project": {"score": {"$meta": "textScore"}}}]))
+
+
+@pytest.mark.unit
+def test_meta_text_score_not_leaked_between_pipelines():
+    """A previous pipeline's $text query must not score a later one."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    list(collection.aggregate(_text_score_pipeline("lightning bolt")))
+
+    with pytest.raises(ValueError, match="textScore"):
+        list(collection.aggregate([{"$project": {"score": {"$meta": "textScore"}}}]))
+
+
+@pytest.mark.unit
+def test_text_search_matches_any_term():
+    """$text matches documents containing any query term, as MongoDB does."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(collection.find({"$text": {"$search": "counterspell shock"}}))
+
+    assert [card["name"] for card in results] == ["Shock"]
+
+
+@pytest.mark.unit
+def test_find_projection_supports_meta_text_score():
+    """find() projections accept {"$meta": "textScore"} too."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(
+        collection.find(
+            {"$text": {"$search": "lightning bolt"}},
+            {"name": 1, "score": {"$meta": "textScore"}},
+        )
+    )
+
+    assert all(card["score"] > 0.0 for card in results)
