@@ -7,12 +7,15 @@ import { getCardByOracleId } from "@/lib/api";
 // clicking a tile opens a modal over the results instead of a full page.
 // The fetch and the markup are still server-side; only the dialog shell is
 // client code. A refresh or a direct visit falls through to app/card/[id].
-
-export const revalidate = 3600;
-
-export async function generateStaticParams() {
-  return [];
-}
+//
+// Deliberately NOT prerendered - no `revalidate`, no `generateStaticParams`
+// (#34). An intercepting route's response depends on the client's router state
+// tree: the payload has to carry the page underneath the modal, which the
+// server only knows from the Next-Url header the router sends. Prerender it
+// and that header is ignored, `children` collapses to __DEFAULT__, and every
+// card click 404s. The hour-long revalidate belongs on app/card/[id], where
+// the response is self-contained. Nothing is lost here: the upstream fetch in
+// getCardByOracleId is cached either way.
 
 interface CardModalProps {
   params: Promise<{ id: string }>;
