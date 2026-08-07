@@ -8,6 +8,10 @@
 
 # testing
 /coverage
+# Failure screenshots written by Vitest Browser Mode. Visual regression is not
+# in scope, so nothing here is a committed baseline.
+**/__screenshots__/
+/.vitest-attachments/
 
 # next.js
 /.next/

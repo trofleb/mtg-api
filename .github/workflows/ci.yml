@@ -125,6 +125,16 @@ jobs:
         working-directory: web-app
         run: pnpm run test:run
 
+      # Vitest Browser Mode drives a real Chromium: jsdom has no layout engine,
+      # so anything asserting a size, a real drag or real focus lives here.
+      - name: Install Playwright Chromium
+        working-directory: web-app
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run component tests (Browser Mode)
+        working-directory: web-app
+        run: pnpm run test:browser
+
   scripts-test:
     needs: changes
     if: ${{ needs.changes.outputs.scripts == 'true' }}
