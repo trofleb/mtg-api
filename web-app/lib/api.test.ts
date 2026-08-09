@@ -92,6 +92,48 @@ describe("api", () => {
       expect(result.cards[0]).not.toHaveProperty("_id");
     });
 
+    // Issue #22. A card with neither id nor _id is a contract violation -
+    // OracleCard requires id - but the fallback turned it into "" without a
+    // word, and CardTile then rendered href="/card/". The card is still
+    // returned so the page does not silently lose a result; what changes is
+    // that the violation is now observable.
+    it("warns rather than silently emitting an empty id", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [{ name: "Propaganda // Propaganda" }],
+          cursor: null,
+          has_more: false,
+        }),
+      });
+
+      const result = await searchCards("propaganda");
+
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn.mock.calls[0].join(" ")).toContain("Propaganda // Propaganda");
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0].id).toBe("");
+      warn.mockRestore();
+    });
+
+    it("does not warn for a card that has an id", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [{ id: "oracle-abc", name: "Lightning Bolt" }],
+          cursor: null,
+          has_more: false,
+        }),
+      });
+
+      await searchCards("bolt");
+
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
     it("should include cursor parameter when provided", async () => {
       const mockResponse = {
         cards: [],

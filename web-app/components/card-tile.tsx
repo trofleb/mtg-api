@@ -22,42 +22,65 @@ export function CardTile({ card }: CardTileProps) {
   const thumbnail = card.thumbnail || card.faces_thumbnails?.[0];
   const rarityEmoji = card.rarity ? RARITY_EMOJI[card.rarity as keyof typeof RARITY_EMOJI] : "⚪";
 
-  return (
-    <Link href={`/card/${card.id}`} scroll={false} data-testid="card-item">
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group h-full">
-        <CardContent className="p-0">
-          <div className="relative aspect-[5/7] bg-muted">
-            {thumbnail ? (
-              <Image
-                src={thumbnail}
-                alt={card.name || "Magic card"}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform"
-                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                No image available
-              </div>
+  // A card with no id has nowhere to link to. `normaliseCard`'s `?? ""`
+  // fallback used to turn that into href="/card/", which Next resolves to
+  // /card - a route that does not exist - so the tile looked ordinary and
+  // 404'd on click. The API should never send one (see issue #22: reversible
+  // cards had no top-level oracle_id to group on), and OracleCard now requires
+  // id, but a tile that cannot be linked must not pretend to be a link.
+  //
+  // Rendered without the wrapper rather than skipped: the card is real and
+  // hiding it would silently shorten the results.
+  const linkable = Boolean(card.id);
+
+  const tile = (
+    <Card
+      className={`overflow-hidden transition-shadow h-full ${
+        linkable ? "hover:shadow-lg cursor-pointer group" : ""
+      }`}
+    >
+      <CardContent className="p-0">
+        <div className="relative aspect-[5/7] bg-muted">
+          {thumbnail ? (
+            <Image
+              src={thumbnail}
+              alt={card.name || "Magic card"}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform"
+              sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              No image available
+            </div>
+          )}
+        </div>
+
+        <div className="p-3 space-y-2">
+          <h3 className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">{card.name}</h3>
+
+          <div className="flex items-center justify-between text-xs">
+            {card.mana_cost && (
+              <span className="text-muted-foreground truncate flex-1">{card.mana_cost}</span>
+            )}
+            {card.rarity && (
+              <span className="ml-2" title={card.rarity}>
+                {rarityEmoji}
+              </span>
             )}
           </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-          <div className="p-3 space-y-2">
-            <h3 className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">{card.name}</h3>
+  if (!linkable) {
+    return tile;
+  }
 
-            <div className="flex items-center justify-between text-xs">
-              {card.mana_cost && (
-                <span className="text-muted-foreground truncate flex-1">{card.mana_cost}</span>
-              )}
-              {card.rarity && (
-                <span className="ml-2" title={card.rarity}>
-                  {rarityEmoji}
-                </span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  return (
+    <Link href={`/card/${card.id}`} scroll={false} data-testid="card-item">
+      {tile}
     </Link>
   );
 }

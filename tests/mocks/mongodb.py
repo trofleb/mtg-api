@@ -5,7 +5,8 @@ collection classes, enabling fast integration tests without external dependencie
 
 Supports MongoDB query operators: $regex, $in, $nin, $all, $size, $gte, $lte, $text, $search, $or, $and, $exists, $eq
 Supports aggregation stages: $match, $project, $group, $sort, $limit
-Supports projection expressions: {"$meta": "textScore"}
+Supports projection expressions: {"$meta": "textScore"}, "$dotted.path",
+{"$ifNull": [...]}, {"$arrayElemAt": [...]}
 
 Deliberate fidelity choices, so tests cannot pass for the wrong reason:
 
@@ -16,11 +17,28 @@ Deliberate fidelity choices, so tests cannot pass for the wrong reason:
   field, so ``f"{score}:{id}"`` cursors read ``"None:<id>"`` as in production.
 - ``$sort`` never raises on ``None`` or mixed types; it orders them the way
   BSON does (null first ascending).
+- A projected field whose value is an *expression* is evaluated rather than
+  dropped, and a dotted path through an array maps over it. So
+  ``"$card_faces.image_uris.normal"`` yields a list, as in MongoDB. Before
+  this, ``CARD_PROJECTION``'s computed fields were always absent from mocked
+  results and a test could not tell a working projection from a broken one.
+- A dotted query path matches *into* an array of subdocuments: MongoDB's
+  ``{"card_faces.oracle_id": x}`` matches when any face has it.
+- An absent field is distinguished from one present and null, via the
+  ``MISSING`` sentinel (see ``mongo_expressions``), because ``$ifNull`` and ``$exists`` turn on that
+  difference.
 """
 
 import re
 from copy import deepcopy
 from typing import Any, Optional
+
+from tests.mocks.mongo_expressions import (
+    MISSING,
+    read_field,
+    resolve_expression,
+    resolve_path,
+)
 
 # Relative field weights of the mock text index. The card name dominates, as
 # in a MongoDB text index whose `name` field carries the highest weight.
@@ -248,7 +266,7 @@ class MockMongoCollection:
                     return False
             elif isinstance(condition, dict):
                 # Field with operators
-                field_value = doc.get(field)
+                field_value = read_field(doc, field)
 
                 for operator, value in condition.items():
                     if operator == "$regex":
@@ -291,15 +309,20 @@ class MockMongoCollection:
                         if field_value is None or field_value > value:
                             return False
                     elif operator == "$exists":
-                        exists = field in doc
+                        exists = resolve_path(doc, field) is not MISSING
                         if exists != value:
                             return False
                     elif operator == "$eq":
                         if field_value != value:
                             return False
             else:
-                # Direct field match
-                if doc.get(field) != condition:
+                # Direct field match. A dotted path through an array of
+                # subdocuments matches when any element carries the value.
+                value = read_field(doc, field)
+                if isinstance(value, list) and not isinstance(condition, list):
+                    if condition not in value:
+                        return False
+                elif value != condition:
                     return False
 
         return True
@@ -322,13 +345,25 @@ class MockMongoCollection:
             for field, spec in projection.items()
             if isinstance(spec, dict) and "$meta" in spec
         }
+        # Anything that is not a 0/1 flag or a $meta request is an expression
+        # to evaluate: a dotted path like "$image_uris.normal", or an operator
+        # document like {"$ifNull": [...]}.
+        computed = {
+            field: spec
+            for field, spec in projection.items()
+            if field not in meta_fields and spec not in (0, 1)
+        }
         plain = {
             field: spec
             for field, spec in projection.items()
-            if field not in meta_fields
+            if field not in meta_fields and field not in computed
         }
 
         result = self._apply_projection(doc, plain)
+        for field, expression in computed.items():
+            value = resolve_expression(expression, doc)
+            if value is not MISSING:
+                result[field] = deepcopy(value)
         for field, meta_kind in meta_fields.items():
             result[field] = self._resolve_meta(meta_kind, doc)
         return result
