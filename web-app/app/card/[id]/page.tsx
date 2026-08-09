@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BackToSearch } from "@/components/back-to-search";
 import { CardDetails } from "@/components/card-details";
-import { Button } from "@/components/ui/button";
 import { getCardByOracleId } from "@/lib/api";
 
 // Standalone, server-rendered card page. This is what a direct visit, a
@@ -37,9 +36,7 @@ export default async function CardPage({ params }: CardPageProps) {
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-3xl font-bold">{card.name}</h1>
-          <Button variant="outline" asChild>
-            <Link href="/">Back to search</Link>
-          </Button>
+          <BackToSearch />
         </div>
         <CardDetails card={card} />
       </div>
