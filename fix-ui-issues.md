@@ -678,33 +678,61 @@ Suggested order:
 Branches 8–11 are Component-layer only and fully parallel once 0c has landed — they need
 neither 0b nor 0d.
 
-### Status as of 2026-08-09
+### Status — plan complete, `integration/remainder`
 
-| | State |
-|---|---|
-| **0c** | ✅ merged — `test/component-layer`. Real Chromium in CI. |
-| **0a + 2** (#21, #24) | ✅ **integrated** — `integration/unit-2` |
-| **0b + 3** (#22) | ✅ **integrated** — including both 0b defect fixes |
-| **1** (#34) | 🟡 implemented, **red never attested**. Needs `next build && next start`. |
+**20 of 21 issues closed. #29 is partial and is the only one left.**
 
-**`integration/unit-2` is fully green — the first time the suite has been.** Verified on the
-combined tree, which no individual agent had ever run:
+Every branch is integrated on `integration/remainder`. Full gate, run on the combined tree that
+no individual agent ever saw:
 
 | Gate | Result |
 |---|---|
-| `uv run pytest -q` | **322 passed, 0 failed** — stable across 4 randomised orders |
-| `ruff check` / `format --check` | clean |
+| `uv run pytest -q` | **377 passed, 0 failed** |
+| `ruff check` / `format --check` (CI scope) | clean |
 | `generate_openapi.py --check` | current |
-| `pnpm check` / `typecheck` | clean (4 pre-existing warnings) |
+| `pnpm typecheck` / `check` | clean (3 warnings) |
 | `generate:api-types` + `git diff --exit-code` | in sync |
-| `pnpm test:run` / `test:browser` | 39 passed / 5 passed + 1 expected fail |
+| `pnpm test:run` / `test:browser` | **72 passed / 38 passed**, no `test.fails` left |
+| Playwright Tier A+B, production build | **36 passed** |
 
-The `1 expected fail` is #36, held red by `test.fails` for Branch 6.
+**#34 is attested, and the attestation survives the merge.** Re-proved after integrating: with
+`revalidate` and `generateStaticParams` restored the in-app-navigation request returns **404**;
+without them, **200**; the direct-request control is unaffected either way. That is the one fix
+in this plan that went three rounds without its red being observed.
 
-**Closed:** #21, #22, #24, and both of 0b's blocking defects. **0b is now safe to deploy** —
-but only as part of this integrated branch, never alone.
+#36's `test.fails` marker is gone — Branch 6 fixed it, which is exactly the forcing function the
+marker existed for.
 
-**Next:** 0d (critical path), or Branches 12 and 8–11 (all cheap and unblocked, see below).
+### What only existed in the combination
+
+Nine agents worked in isolated worktrees, so two defect classes belonged to no branch and were
+found only at merge. Worth remembering as a property of parallel isolation, not a mistake:
+
+1. **The stub spoke a contract that no longer existed.** 0d branched before #26, so it registered
+   `/cards/search/:text` (matching nothing), omitted the now-required `total` (failing its own
+   ajv validator), and still projected `edhrec_rank`/`penny_rank` (removed from the contract).
+   Its `decodePathSeparators` shim — written to keep #26 visible through the stub — had a comment
+   saying to delete it at exactly this moment.
+2. **Tiles gained a `?q=` suffix, and three specs assumed a bare href.** Including the #34
+   attestation spec. Its regex had been half-repaired upstream: excluding `?` from the capture
+   was not enough, because the trailing `"` then matched nothing at all.
+
+**The lesson for the next parallel batch:** when one branch changes a contract, every branch
+authored against the old one is silently stale, and the isolation that prevents merge conflicts
+is exactly what hides it. Budget an integration pass; do not treat merge as mechanical.
+
+### #29 — the one open issue
+
+The unmatched-URL case is fixed and branded, with and without JS. The stated defect —
+`/card/<bogus-id>` rendering zero visible characters without JavaScript — is **not fixed, and the
+plan's diagnosis of it was wrong**. The `@modal` parallel slot is not the cause: Next 16.0.3's
+`app-render.js` catches `notFound()` out of the HTML render and answers with `getErrorRSCPayload`,
+whose seed is a hardcoded empty `<html id="__next_error__">`. Four independent probes (removing
+`@modal` from the route tree; a bare `notFound()` page; a bare `throw` page; a segment-level
+`not-found.tsx`) all reproduce the empty document.
+
+Held red with `test.fail()` so a Next upgrade flips the suite. **Reopen it with the `app-render.js`
+finding attached** rather than leaving it recorded as "fixed by adding not-found.tsx".
 
 ---
 
@@ -753,6 +781,40 @@ models. The rule is executable, not just written down here.
 
 **Visual regression is deferred.** Not in scope; revisit once the Component layer has settled
 and there is a design system worth pinning.
+
+### Deploy coupling — read before shipping
+
+Same class of rule as "0b must not deploy without 3", and there are now two:
+
+1. **#26 removes `/cards/search/{text}` with no compatibility alias.** An API-first deploy 404s
+   **every search** from the still-running web-app image for the whole rollover. Ship both images
+   together, or add the alias deliberately.
+2. **Ship the `card_faces.oracle_id` MongoDB index in the same deploy as #22.** `oracle_id_match()`
+   emits an `$or` whose second branch scans that field; without the index it is a collection scan
+   on every card-page load. No test can catch this.
+
+### Carried forward — closed with caveats
+
+- **#38** — markup and FormData payload verified in real Chromium. The actual no-JS *submit* is
+  untested; Browser Mode always has JS, and the Tier B spec was never written.
+- **#39** — JS-only. `BackToSearch` reads `useSearchParams` behind `<Suspense>`; with JS off the
+  link falls back to `/`. Making it server-rendered would delete `s-maxage=3600` from the card
+  route and thereby disarm #34's own prerendering tripwire. A deliberate trade.
+- **`app/error.tsx` has no HTTP-level test** and does not cover the prerendered card route, which
+  returns plain-text `Internal Server Error` on an API 500.
+- **`app/utils/api.py` (Streamlit) changed with zero test execution** — `streamlit` is not in the
+  `tests` extra. It also carried an unfiled bug, now fixed: filters were sent as a JSON body the
+  endpoint has never read, so no Streamlit filter has ever had any effect.
+- **New unfiled defect:** `tasks/indexes.py:62` declares an index on `edhrec_rank`, a field both
+  ingestion paths delete before insert. Same class as the dead-field bug just fixed.
+- **Stale docs** still describe `/cards/search/{text}`: `documentation/mongodb-mocking-strategy.md`
+  and `documentation/phase-5-search-endpoint-tests-plan.md`.
+
+### Next
+
+One cheap branch closes the Tier B gaps against a harness that now exists: #38's
+`javaScriptEnabled: false` submit, #25's rendered total, Branch 6's width assertion on the real
+page, and a CSP assertion against a real `/`. Then reopen #29 as its own investigation.
 
 **New issue found during `[0b + 3]`, not yet filed.** Both ingestion tasks
 `del card["edhrec_rank"]` before insert, and `CARD_PROJECTION` projects neither rank field — so
