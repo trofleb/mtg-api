@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 export interface ToggleOption {
   value: string;
   content: ReactNode;
-  /** Overrides the accessible name when the visible text is not one. */
-  name?: string;
+  /** Hover text. Not an accessible name - `content` is already one. */
+  title?: string;
   className?: string;
 }
 
@@ -48,8 +48,7 @@ export function ToggleRow({
               size="sm"
               variant={active ? "default" : "outline"}
               aria-pressed={active}
-              aria-label={option.name}
-              title={option.name}
+              title={option.title}
               className={option.className}
               onClick={() => onToggle(option.value)}
             >

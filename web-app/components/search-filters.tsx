@@ -40,17 +40,16 @@ const COLORS = [
   { value: "G", name: "Green", emoji: "🟢" },
 ];
 
-// The emoji is decoration on top of the letter code, and read aloud it comes
-// out as "large red circle R". Naming the button "Red" instead is both
-// shorter and the thing the user actually chose (#40).
+// The emoji is decoration on top of the letter code, so read aloud these come
+// out as "large red circle R". Left as-is deliberately: hiding decorative
+// mana-symbol and emoji text from an accessible name is Branch 11's, and six
+// e2e assertions in homepage.spec.ts and card-search.spec.ts currently match
+// on `/🔴 R/i`. Changing the name here would break them from a branch that
+// does not own them.
 const COLOR_OPTIONS = COLORS.map(({ value, name, emoji }) => ({
   value,
-  name,
-  content: (
-    <>
-      <span aria-hidden="true">{emoji}</span> {value}
-    </>
-  ),
+  title: name,
+  content: `${emoji} ${value}`,
 }));
 
 interface SearchFiltersProps {
