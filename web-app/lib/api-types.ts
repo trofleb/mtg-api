@@ -253,10 +253,16 @@ export interface components {
       artist?: string | null;
       /** Cmc */
       cmc?: number | null;
-      /** Color Identity */
-      color_identity?: ("W" | "U" | "B" | "R" | "G")[] | null;
-      /** Colors */
-      colors?: ("W" | "U" | "B" | "R" | "G")[] | null;
+      /**
+       * Color Identity
+       * @description Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.
+       */
+      color_identity?: string[] | null;
+      /**
+       * Colors
+       * @description Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.
+       */
+      colors?: string[] | null;
       /** Faces Thumbnails */
       faces_thumbnails?: string[] | null;
       /** Flavor Name */
@@ -273,7 +279,7 @@ export interface components {
       imageXL?: string | null;
       /** Image Uris */
       image_uris?: {
-        [key: string]: string;
+        [key: string]: string | null;
       } | null;
       /** Lang */
       lang?: string | null;
@@ -295,7 +301,7 @@ export interface components {
       rarity?: string | null;
       /** Related Uris */
       related_uris?: {
-        [key: string]: string;
+        [key: string]: string | null;
       } | null;
       /** Released At */
       released_at?: string | null;
@@ -344,8 +350,11 @@ export interface components {
       cards: components["schemas"]["CardPrinting"][];
       /** Cmc */
       cmc?: number | null;
-      /** Colors */
-      colors?: ("W" | "U" | "B" | "R" | "G")[] | null;
+      /**
+       * Colors
+       * @description Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.
+       */
+      colors?: string[] | null;
       /** Edhrec Rank */
       edhrec_rank?: number | null;
       /** Faces Thumbnails */
@@ -395,8 +404,11 @@ export interface components {
       cards: components["schemas"]["CardPrinting"][];
       /** Cmc */
       cmc?: number | null;
-      /** Colors */
-      colors?: ("W" | "U" | "B" | "R" | "G")[] | null;
+      /**
+       * Colors
+       * @description Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.
+       */
+      colors?: string[] | null;
       /** Edhrec Rank */
       edhrec_rank?: number | null;
       /** Faces Thumbnails */

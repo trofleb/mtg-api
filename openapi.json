@@ -44,13 +44,6 @@
             "anyOf": [
               {
                 "items": {
-                  "enum": [
-                    "W",
-                    "U",
-                    "B",
-                    "R",
-                    "G"
-                  ],
                   "type": "string"
                 },
                 "type": "array"
@@ -59,19 +52,13 @@
                 "type": "null"
               }
             ],
+            "description": "Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.",
             "title": "Color Identity"
           },
           "colors": {
             "anyOf": [
               {
                 "items": {
-                  "enum": [
-                    "W",
-                    "U",
-                    "B",
-                    "R",
-                    "G"
-                  ],
                   "type": "string"
                 },
                 "type": "array"
@@ -80,6 +67,7 @@
                 "type": "null"
               }
             ],
+            "description": "Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.",
             "title": "Colors"
           },
           "faces_thumbnails": {
@@ -162,7 +150,14 @@
             "anyOf": [
               {
                 "additionalProperties": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "type": "object"
               },
@@ -268,7 +263,14 @@
             "anyOf": [
               {
                 "additionalProperties": {
-                  "type": "string"
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "type": "object"
               },
@@ -449,13 +451,6 @@
             "anyOf": [
               {
                 "items": {
-                  "enum": [
-                    "W",
-                    "U",
-                    "B",
-                    "R",
-                    "G"
-                  ],
                   "type": "string"
                 },
                 "type": "array"
@@ -464,6 +459,7 @@
                 "type": "null"
               }
             ],
+            "description": "Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.",
             "title": "Colors"
           },
           "edhrec_rank": {
@@ -637,13 +633,6 @@
             "anyOf": [
               {
                 "items": {
-                  "enum": [
-                    "W",
-                    "U",
-                    "B",
-                    "R",
-                    "G"
-                  ],
                   "type": "string"
                 },
                 "type": "array"
@@ -652,6 +641,7 @@
                 "type": "null"
               }
             ],
+            "description": "Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.",
             "title": "Colors"
           },
           "edhrec_rank": {
