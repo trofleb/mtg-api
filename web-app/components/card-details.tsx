@@ -12,13 +12,47 @@ interface CardDetailsProps {
 }
 
 export function CardDetails({ card }: CardDetailsProps) {
-  const thumbnail = card.thumbnail || card.faces_thumbnails?.[0];
+  // Issue #35. The branch is decided by how many faces the card has, not by
+  // whether a thumbnail could be derived. The previous condition asked for
+  // `!thumbnail` on a `thumbnail` that already fell back to
+  // `faces_thumbnails[0]`, so a card with faces could never reach the
+  // two-face renderer and its back face was never drawn.
+  //
+  // Face count is also the honest question: a split or adventure card
+  // projects `faces_thumbnails` from face images that mostly do not exist,
+  // which yields nothing or a single entry. Only two or more faces are worth
+  // a two-up grid.
+  //
+  // Naming each face up front gives the images distinguishable alt text and
+  // a key that is not the array position: the two faces of a reversible card
+  // can share an image URL, so the URL alone would collide.
+  const faces = (card.faces_thumbnails ?? []).map((src, index) => ({
+    src,
+    name: `${card.name} face ${index + 1}`,
+    first: index === 0,
+  }));
+  const thumbnail = card.thumbnail || faces[0]?.src;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Left Column - Image(s) */}
       <div className="space-y-4">
-        {thumbnail ? (
+        {faces.length > 1 ? (
+          <div className="grid grid-cols-2 gap-2">
+            {faces.map((face) => (
+              <div key={face.name} className="relative aspect-[5/7]">
+                <Image
+                  src={face.src}
+                  alt={face.name}
+                  fill
+                  className="object-contain rounded-lg"
+                  sizes="50vw"
+                  priority={face.first}
+                />
+              </div>
+            ))}
+          </div>
+        ) : thumbnail ? (
           <div className="relative aspect-[5/7] w-full">
             <Image
               src={thumbnail}
@@ -28,20 +62,6 @@ export function CardDetails({ card }: CardDetailsProps) {
               sizes="(max-width: 768px) 100vw, 50vw"
               priority
             />
-          </div>
-        ) : card.faces_thumbnails && card.faces_thumbnails.length > 0 ? (
-          <div className="grid grid-cols-2 gap-2">
-            {card.faces_thumbnails.map((img, i) => (
-              <div key={img} className="relative aspect-[5/7]">
-                <Image
-                  src={img}
-                  alt={`${card.name} face ${i + 1}`}
-                  fill
-                  className="object-contain rounded-lg"
-                  sizes="50vw"
-                />
-              </div>
-            ))}
           </div>
         ) : (
           <div className="flex items-center justify-center aspect-[5/7] bg-muted rounded-lg text-muted-foreground text-sm">
