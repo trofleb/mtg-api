@@ -64,21 +64,26 @@ test("the harness renders with real Tailwind and a real layout engine", async ()
 // is a reconstruction, and a px threshold would encode its drift instead of
 // the bug.
 //
-// Measured: 26px of a 256px row, a ratio of 0.1015625. Worth recording that
-// with globals.css *not* imported the same ratio measures 0.478 - close
-// enough to the threshold that a looser bound would have gone green off the
-// unstyled defaults and proved nothing. Hence the harness check above.
+// Measured before the fix: a ratio of 0.1015625 at 320px (26px of a 256px
+// row) and 0.2513565112540193 at 375px. Worth recording that with
+// globals.css *not* imported the 320px ratio measures 0.478 - close enough to
+// the threshold that a looser bound would have gone green off the unstyled
+// defaults and proved nothing. Hence the harness check above.
 //
-// FIXED BY BRANCH 6 (`fix/search-form`), NOT HERE. It is marked `.fails` so
-// CI stays green while the assertion stays in the tree. When Branch 6 lands,
-// this reports "expected to fail, but passed" - drop the `.fails` then.
-test("#36 - search input keeps a usable share of its row at 320px", async () => {
-  const { input, row } = await renderAtWidth(320);
+// Fixed by Branch 6 (`fix/search-form`), which is where the `.fails` marker
+// this test carried came off: once the assertion passes, vitest reports
+// "expected to fail, but passed" and the marker turns the suite red for the
+// opposite reason.
+test.for([320, 375])(
+  "#36 - search input keeps a usable share of its row at %ipx",
+  async (width) => {
+    const { input, row } = await renderAtWidth(width);
 
-  const inputWidth = input.getBoundingClientRect().width;
-  const rowWidth = row.getBoundingClientRect().width;
-  expect(rowWidth).toBeGreaterThan(0);
+    const inputWidth = input.getBoundingClientRect().width;
+    const rowWidth = row.getBoundingClientRect().width;
+    expect(rowWidth).toBeGreaterThan(0);
 
-  // The primary control of the app should own at least half of its row.
-  expect(inputWidth / rowWidth).toBeGreaterThan(0.5);
-});
+    // The primary control of the app should own at least half of its row.
+    expect(inputWidth / rowWidth).toBeGreaterThan(0.5);
+  }
+);
