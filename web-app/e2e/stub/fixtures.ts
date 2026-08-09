@@ -1,5 +1,5 @@
 import type { components } from "../../lib/api-types";
-import reversibleDocument from "./data/reversible-cards.json";
+import reversibleDocument from "./documents/reversible-cards.json";
 import { aggregate, type SourceCard } from "./projection";
 
 /**

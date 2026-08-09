@@ -42,7 +42,7 @@ jobs:
               # MSW stub builds its fixtures from the same copy. Editing it
               # for the frontend's benefit changes what pytest asserts on, so
               # the backend job has to re-run.
-              - 'web-app/e2e/stub/data/**'
+              - 'web-app/e2e/stub/documents/**'
             web-app:
               - 'web-app/**'
               - 'openapi.json'

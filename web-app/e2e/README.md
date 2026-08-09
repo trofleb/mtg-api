@@ -69,7 +69,7 @@ Fully generated response data cannot work here, whatever the tooling:
 
 ## Shared fixtures
 
-`stub/data/reversible-cards.json` is loaded by **both**
+`stub/documents/reversible-cards.json` is loaded by **both**
 `tests/fixtures/reversible_cards.py` and `stub/fixtures.ts`, so pytest and
 Tier B cannot disagree about what a reversible card is. Editing it changes
 both suites; `ci.yml`'s `backend` paths-filter includes it for that reason.
