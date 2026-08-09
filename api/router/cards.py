@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Optional
 
 from fastapi import HTTPException, Query
@@ -7,6 +8,8 @@ from unidecode import unidecode
 from api.helpers.cards_mongo import AGGREGATE_CARD, CARD_PROJECTION
 from api.helpers.database import CardsCollection
 from api.models.cards import CardPrinting, OracleCard, SearchResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -131,7 +134,11 @@ def search_card_by_text(
     # Build aggregation pipeline
     pipeline = [
         {"$match": match_conditions},
-        {"$project": {"score": 1, **CARD_PROJECTION}},
+        # "score": 1 would project each document's own "score" field, which
+        # card documents do not have. Only {"$meta": "textScore"} asks for the
+        # $text relevance score, without which every document ties at null and
+        # the $sort below degenerates to _id ascending.
+        {"$project": {"score": {"$meta": "textScore"}, **CARD_PROJECTION}},
         {"$group": {"score": {"$max": "$score"}, **AGGREGATE_CARD}},
         {
             "$sort": {"score": -1, "_id": 1}
@@ -161,8 +168,15 @@ def search_card_by_text(
                 }
             )
         except (ValueError, IndexError):
-            # Invalid cursor format, ignore it
-            pass
+            # An unusable cursor is served as if it were the first page. That
+            # is a pagination loop from the client's side, so say so rather
+            # than returning 200 with nothing in the logs.
+            logger.warning(
+                'Ignoring malformed pagination cursor %r for search "%s"; '
+                'expected "<score>:<oracle_id>". Serving the first page.',
+                cursor,
+                text,
+            )
 
     # Add limit
     pipeline.append({"$limit": page_count + 1})
