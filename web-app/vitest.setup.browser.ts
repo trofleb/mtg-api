@@ -35,11 +35,24 @@ vi.mock("next/navigation", () => ({
 // biome-ignore lint/suspicious/noExplicitAny: mirrors the jsdom setup's mock
 type AnyProps = any;
 
+// `__esModule: true` is load-bearing, not boilerplate. next/image and
+// next/link are CommonJS, so Vite compiles `import Image from "next/image"`
+// through an esbuild interop helper that only unwraps `.default` when the
+// module marks itself as ESM. Without the flag the helper hands the importer
+// the whole namespace object, and React rejects it with "Element type is
+// invalid: ... but got: object".
+//
+// Nothing caught this before because no browser spec had yet rendered a
+// component importing either module - search-form.browser.test.tsx uses
+// neither. Found by card-tile.browser.test.tsx.
+
 vi.mock("next/image", () => ({
+  __esModule: true,
   default: (props: AnyProps) => React.createElement("img", props),
 }));
 
 vi.mock("next/link", () => ({
+  __esModule: true,
   default: ({ children, href, ...props }: AnyProps) =>
     React.createElement("a", { href, ...props }, children),
 }));

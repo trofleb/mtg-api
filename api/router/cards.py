@@ -5,7 +5,7 @@ from fastapi import HTTPException, Query
 from fastapi.routing import APIRouter
 from unidecode import unidecode
 
-from api.helpers.cards_mongo import AGGREGATE_CARD, CARD_PROJECTION
+from api.helpers.cards_mongo import AGGREGATE_CARD, CARD_PROJECTION, oracle_id_match
 from api.helpers.database import CardsCollection
 from api.models.cards import CardPrinting, OracleCard, SearchResponse
 
@@ -243,9 +243,11 @@ def get_cards_by_oracle_id(oracle_id: str, collection: CardsCollection):
         HTTPException: 404 if no cards found with this oracle_id
     """
 
-    # Query MongoDB for all cards with this Oracle ID
+    # Query MongoDB for all cards with this Oracle ID. A reversible card
+    # carries its oracle ids on the faces rather than the document, so the
+    # lookup has to check both places.
     cards = list(
-        collection.find({"oracle_id": oracle_id}, CARD_PROJECTION).sort(
+        collection.find(oracle_id_match(oracle_id), CARD_PROJECTION).sort(
             "released_at", -1
         )
     )
@@ -282,7 +284,7 @@ def get_aggregated_card_by_oracle_id(oracle_id: str, collection: CardsCollection
         card
         for card in collection.aggregate(
             [
-                {"$match": {"oracle_id": oracle_id}},
+                {"$match": oracle_id_match(oracle_id)},
                 {"$project": CARD_PROJECTION},
                 {"$sort": {"released_at": -1}},
                 {"$group": AGGREGATE_CARD},

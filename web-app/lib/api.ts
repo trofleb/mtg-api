@@ -36,7 +36,20 @@ type RawOracleCard = Omit<SearchResultCard, "id"> & { id?: string; _id?: string 
 
 function normaliseCard(raw: RawOracleCard): SearchResultCard {
   const { _id, ...rest } = raw;
-  return { ...rest, id: rest.id ?? _id ?? "" };
+  const id = rest.id ?? _id ?? "";
+
+  // Neither key means the API broke its own contract - OracleCard declares id
+  // required. Issue #22 was exactly this: reversible cards have no top-level
+  // oracle_id to group on, so they came back keyed null, and the "" below was
+  // handed to CardTile as href="/card/". The card is still returned, because
+  // dropping it would shorten the page for a reason nobody could see; but the
+  // violation is logged instead of being absorbed, and CardTile no longer
+  // renders an unlinkable card as a link.
+  if (!id) {
+    console.warn(`[api] card has no id and cannot be linked: ${rest.name ?? "<unnamed>"}`);
+  }
+
+  return { ...rest, id };
 }
 
 // Server-side only. These are called from server components, so the fetch
