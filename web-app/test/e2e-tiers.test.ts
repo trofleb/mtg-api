@@ -20,7 +20,14 @@ import { describe, expect, it } from "vitest";
 const WEB_APP_ROOT = path.resolve(__dirname, "..");
 const PLAYWRIGHT_CLI = path.join(WEB_APP_ROOT, "node_modules/@playwright/test/cli.js");
 
-/** Spec files a given Playwright config would run, relative to `e2e/`. */
+const E2E_ROOT = path.join(WEB_APP_ROOT, "e2e");
+
+/**
+ * Spec files a given Playwright config would run, relative to `e2e/`.
+ *
+ * Reported paths are relative to each config's own rootDir, which differs
+ * between the two, so they are re-anchored on `e2e/` before comparison.
+ */
 function discoveredSpecs(config: string): string[] {
   const stdout = execFileSync(
     process.execPath,
@@ -28,8 +35,12 @@ function discoveredSpecs(config: string): string[] {
     { cwd: WEB_APP_ROOT, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 }
   );
 
-  const report = JSON.parse(stdout) as { suites: { file: string }[] };
-  return report.suites.map((suite) => suite.file).sort();
+  const report = JSON.parse(stdout) as { config: { rootDir: string }; suites: { file: string }[] };
+
+  return report.suites
+    .map((suite) => path.relative(E2E_ROOT, path.resolve(report.config.rootDir, suite.file)))
+    .map((file) => file.split(path.sep).join("/"))
+    .sort();
 }
 
 /** Every `*.spec.ts` under `e2e/`, relative to `e2e/`, so none can be orphaned. */

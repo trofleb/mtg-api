@@ -9,11 +9,21 @@ import { type APIRequestContext, expect, test } from "@playwright/test";
  * CardModal and render it and it passes, as it always did. Only an HTTP
  * request carrying the router's own headers can see it.
  *
- * Tier C (live) for now: it needs a card id the API actually knows about, and
- * the regression is live in production while the stub does not exist yet.
- * Promote this spec to Tier B (e2e/stubbed/) once branch 0d lands - the
- * assertions are unchanged, only API_URL moves. Do not skip the promotion:
- * against Tier C this test depends on production data.
+ * Promoted from Tier C to Tier B by branch 0d, as its own note asked for.
+ * The assertions below are byte-for-byte what they were when this file lived
+ * in `e2e/live/`; the only thing that changed is where `API_URL` points, so
+ * the card id now comes from the stub's fixtures instead of from whatever
+ * happened to be first in production that day.
+ *
+ * Two things had to be true for the promotion to be worth anything, and both
+ * were checked rather than assumed:
+ *
+ *   1. Tier B runs a production build (`next build && next start`), because
+ *      `next dev` never prerenders and this bug is invisible without
+ *      prerendering. See `playwright.config.ts`.
+ *   2. The spec still goes red on the unfixed code. Attested by re-adding
+ *      `export const revalidate` and `generateStaticParams` to
+ *      app/@modal/(.)card/[id]/page.tsx and watching this file fail.
  */
 
 // What the App Router sends when it navigates to /card/<id> from within the
@@ -41,8 +51,11 @@ async function firstCardId(request: APIRequestContext): Promise<string> {
  *
  * This is not defensive padding - it was measured. `next dev` never prerenders,
  * so the unfixed code answers the request below with 200 there and the
- * assertion passes with the bug fully present. Since `just test-e2e` and
- * `just test-e2e-vps` both boot `pnpm run dev`, that is the default local run.
+ * assertion passes with the bug fully present.
+ *
+ * Tier B now boots `next build && next start`, so in the normal run this
+ * guard never fires. It stays because `E2E_DEV_SERVER=1` exists, and because
+ * a build that has quietly stopped prerendering is itself worth hearing about.
  *
  * The hour-long s-maxage on the standalone card page is the signal: it comes
  * from `export const revalidate = 3600` in app/card/[id], which only takes
@@ -57,10 +70,10 @@ async function isPrerenderingBuild(request: APIRequestContext, cardId: string): 
 
 const NOT_PRERENDERING =
   "skipped, not passed: this server does not prerender, and #34 is invisible without " +
-  "prerendering. Either (a) it is a `next dev` server - rerun against a deployed " +
-  "BASE_URL (`just test-e2e-prod`) or a local `next build && next start`; or (b) it is a " +
-  "production build and app/card/[id] has lost `export const revalidate = 3600`, which " +
-  "is PR #17's caching win and a defect in its own right. Both need looking at.";
+  "prerendering. Either (a) it is a `next dev` server - unset E2E_DEV_SERVER so Tier B " +
+  "boots `next build && next start`; or (b) it is a production build and app/card/[id] " +
+  "has lost `export const revalidate = 3600`, which is PR #17's caching win and a defect " +
+  "in its own right. Both need looking at.";
 
 test.describe("intercepted card modal (#34)", () => {
   test("serves the modal payload for an in-app navigation", async ({ request }) => {

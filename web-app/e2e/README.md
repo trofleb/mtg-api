@@ -1,172 +1,119 @@
 # End-to-End Tests
 
-Playwright e2e tests for the MTG Card Search web application.
+Playwright tests for the MTG Card Search web app, in three tiers.
 
-## Quick Start
+```
+e2e/
+  static/    Tier A - next start, no data at all
+  stubbed/   Tier B - next start + the node API stub, API_URL pointed at it
+  live/      Tier C - the real stack, or a deployed BASE_URL
+  stub/      the MSW server and its fixtures - not tests
+```
 
-### Recommended: VPS API (One Command)
+| Tier | Boots | Needs a database | Runs |
+|------|-------|------------------|------|
+| A `static` | `next start` | no | every PR, seconds |
+| B `stubbed` | `next start` + node stub | no | every PR |
+| C `live` | real API + Mongo + Meili, or a deployed URL | yes | post-deploy smoke |
+
+## Running them
 
 ```bash
-# From project root - automatic tunnel setup and cleanup
-just test-e2e-vps
-
-# Interactive UI mode
-just test-e2e-ui-vps
+just test-e2e            # tiers A and B - boots everything itself
+just test-e2e-static     # tier A only
+just test-e2e-stubbed    # tier B only
+just test-e2e-live       # tier C against a local stack
+BASE_URL=https://mtg.nicocasa.ch just test-e2e-live   # tier C, deployed
 ```
 
-This automatically:
-- Starts SSH tunnel to VPS API
-- Runs all Playwright tests
-- Cleans up tunnel when done
+Nothing in tiers A or B needs Docker, a database or the VPS tunnel. They are
+what CI runs.
 
-### Local API
+## Why the stub exists, and why it is a separate process
 
-```bash
-# Terminal 1: Start API
-docker-compose up api
+`lib/api.ts` fetches **server-side only**:
 
-# Terminal 2: Run tests
-just test-e2e
+```ts
+const API_BASE_URL = process.env.API_URL ?? "http://api:8000";
 ```
 
-### UI Tests Only (No API Required)
+Every call is made from a server component, inside the Next.js process. The
+browser never talks to the API, so **MSW-in-browser and `page.route()` cannot
+intercept the app's data fetching** - there is nothing to intercept on the
+client. What works instead is to run the handlers in a node process that
+listens on a port and point `API_URL` at it. That single variable is the whole
+process boundary: aim it at the stub and the Next server runs identically -
+real routing, real RSC resolution, real ISR, real headers - with deterministic
+data and no Mongo, no Meilisearch and no API container.
 
-```bash
-# From web-app directory
-pnpm run test:e2e e2e/homepage.spec.ts
-```
+`e2e/stub/server.ts` is that process. `playwright.config.ts` starts it as the
+first of two `webServer` entries.
 
-## Test Files
+## The stub: generated contract, hand-written fixtures
 
-- **`homepage.spec.ts`** - UI-only tests (no API required) ✅ 6/6 passing
-- **`card-search.spec.ts`** - Card search with API integration
-- **`api.spec.ts`** - Direct API endpoint tests
+| Part | Source | Guarantee |
+|------|--------|-----------|
+| Response types | generated from `openapi.json` into `lib/api-types.ts` | cannot drift - CI regenerates and fails on a diff |
+| Fixture documents | hand-written, typed against those types | deterministic; `tsc` fails if the schema moves under them |
+| Every response | re-checked at runtime against `openapi.json` (`stub/validate.ts`) | a stub that drifts stops the run instead of serving fiction |
 
-## Common Commands
+Fully generated response data cannot work here, whatever the tooling:
 
-```bash
-# VPS API tests (recommended)
-just test-e2e-vps              # Run all tests
-just test-e2e-vps e2e/api.spec.ts  # Run specific file
-just test-e2e-ui-vps           # Interactive UI mode
+- #29/#30 need a **404 for a specific id**. Prism steers status with a
+  `Prefer: code=404` request header, and the client is the Next server, which
+  cannot be made to send one.
+- #22 needs `oracle_id` to be **absent**. Generators produce present-and-valid
+  values, never structured absence.
+- #21 needs 21+ **stable** ids across two pages with a round-tripping cursor.
+  A stateless generator would return fresh cards for page 2.
 
-# Local API tests
-just test-e2e                  # All tests
-just test-e2e-ui               # Interactive mode
-just test-e2e-debug            # Debug with inspector
+## Shared fixtures
 
-# From web-app directory
-pnpm run test:e2e              # All tests
-pnpm run test:e2e:ui           # Interactive mode
-pnpm run test:e2e:debug        # Debug mode
-pnpm run test:e2e e2e/homepage.spec.ts  # Specific file
-```
+`stub/data/reversible-cards.json` is loaded by **both**
+`tests/fixtures/reversible_cards.py` and `stub/fixtures.ts`, so pytest and
+Tier B cannot disagree about what a reversible card is. Editing it changes
+both suites; `ci.yml`'s `backend` paths-filter includes it for that reason.
 
-## How It Works
+The stub's `$text` matching is an OR over terms, as MongoDB's is - which is
+why the shared query `"propaganda tower"` returns both documents in either
+suite.
 
-### VPS Tunnel Setup
+## Why the configs are split
 
-The `just test-e2e-vps` command:
+Playwright's `webServer` is top-level, not per-project, and Tier C needs a
+different server from A and B. So: `playwright.config.ts` for A+B,
+`playwright.live.config.ts` for C.
 
-1. Starts SSH tunnel container via `docker-compose.vps-dev.yml`
-2. Tunnels VPS API to `localhost:8000`
-3. Waits for API to respond
-4. Runs Playwright tests with `--reporter=list` (non-blocking)
-5. Automatically tears down tunnel
+`test/e2e-tiers.test.ts` asserts the split holds - that neither config
+discovers the other's specs, and that no spec sits in a directory neither
+config runs.
 
-### Local API Setup
+## Tier B runs a production build
 
-Requirements:
-- Docker Compose
-- API running on port 8000
+`next dev` never prerenders, so anything about caching, ISR or prerendering is
+invisible against it. Measured: with #34's bug present, a dev server answers
+the intercepting route with 200 and the test passes. Tier B therefore boots
+`next build && next start`. `E2E_DEV_SERVER=1` swaps back for fast local
+iteration, at the cost of the specs that need a real build skipping themselves
+- loudly.
 
-```bash
-# Start full stack
-docker-compose up api
+## What no tier can catch
 
-# Verify API is ready
-curl http://localhost:8000/ping  # Should return: pong
-```
+- **The image optimizer**, below Tier C. jsdom and Browser Mode both mock
+  `next/image` away and neither harness runs a Next server, so `/_next/image`
+  just 404s there. `live/smoke.spec.ts` is the only thing watching it.
+- **The real network.** `API_URL=http://api:8000` resolving inside the Docker
+  network, real Mongo indexes, Meilisearch availability - all Tier C.
+- **Whether the stub matches production.** It matches the *committed contract*,
+  which the backend job proves is current. Deploy skew is a different
+  question.
 
-## Debugging
+## Writing a new spec
 
-### View Test Artifacts
+Pick the tier by what the spec needs, not by convenience:
 
-Failed tests generate:
-- Screenshots in `test-results/`
-- Videos in `test-results/`
-- Traces for retry attempts
+- asserts something true with no data at all → `static/`
+- needs card data, but any deterministic card data will do → `stubbed/`
+- needs *real* data, a real database, or a real deploy → `live/`
 
-### Trace Viewer
-
-```bash
-npx playwright show-trace path/to/trace.zip
-```
-
-### Common Issues
-
-**Tunnel fails to start:**
-```bash
-# Check VPS connection in .env (VPS_HOST, VPS_USER, VPS_API_PORT)
-# Verify 1Password SSH agent is running
-```
-
-**Tests timeout:**
-```bash
-# Verify API is accessible
-curl http://localhost:8000/ping
-```
-
-**"Apply Filters" button ambiguity:**
-- Use more specific selectors in tests
-- This is a known issue being addressed
-
-## Configuration
-
-Playwright config (`playwright.config.ts`):
-- Base URL: `http://localhost:8080`
-- Browser: Chromium
-- Timeout: 30s per test
-- Retries: 2 in CI, 0 locally
-- Reporters: List (non-blocking), JSON
-
-Web server auto-start:
-- Development: `pnpm run dev`
-- CI: `pnpm run build && pnpm run start`
-- Timeout: 120s
-
-## Writing Tests
-
-### Best Practices
-
-```typescript
-// Use semantic selectors
-page.getByRole('button', { name: 'Search', exact: true })
-page.getByLabel('Email')
-
-// Wait explicitly
-await expect(page.getByText('Results')).toBeVisible({ timeout: 10000 });
-
-// Use data-testid for complex elements
-page.locator('[data-testid="card-item"]')
-```
-
-### Test Structure
-
-```typescript
-test.describe('Feature Name', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto('/');
-  });
-
-  test('specific behavior', async ({ page }) => {
-    // test code
-  });
-});
-```
-
-## Resources
-
-- [Playwright Documentation](https://playwright.dev/)
-- [Playwright Best Practices](https://playwright.dev/docs/best-practices)
-- [Next.js Testing Guide](https://nextjs.org/docs/testing)
+If a spec would be equally true in two tiers, put it in the cheaper one.

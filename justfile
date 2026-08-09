@@ -102,8 +102,30 @@ test-watch:
 test-file file:
     uv run --extra tests pytest {{file}} -v
 
-# E2E Testing (Playwright - web-app)
-# Recommended: `just test-e2e-vps` - automatic VPS tunnel with cleanup
+# E2E Testing (Playwright - web-app), in three tiers
+#
+#   A  e2e/static/   next start, no data at all
+#   B  e2e/stubbed/  next start + the node API stub, API_URL pointed at it
+#   C  e2e/live/     the real stack, or a deployed BASE_URL
+#
+# A and B need no database, no Docker and no tunnel - `just test-e2e` boots
+# everything itself and is what CI runs. The VPS recipes below are Tier C.
+
+# Run tiers A and B (no API, no database, no tunnel needed)
+test-e2e *args:
+    cd web-app && pnpm run test:e2e --reporter=list {{args}}
+
+# Tier A only - headers, robots, favicon, sitemap
+test-e2e-static *args:
+    cd web-app && pnpm run test:e2e:static --reporter=list {{args}}
+
+# Tier B only - the app against the deterministic API stub
+test-e2e-stubbed *args:
+    cd web-app && pnpm run test:e2e:stubbed --reporter=list {{args}}
+
+# Tier C - live smoke against a real stack (BASE_URL=... for a deployment)
+test-e2e-live *args:
+    cd web-app && pnpm run test:e2e:live --reporter=list {{args}}
 
 # Run e2e tests with VPS API (automatic tunnel setup and cleanup)
 test-e2e-vps *args:
@@ -116,7 +138,7 @@ test-e2e-vps *args:
     sleep 3
     if curl -sf http://localhost:8000/ping > /dev/null; then
         echo "✅ VPS API ready"
-        cd web-app && pnpm run test:e2e --reporter=list {{args}}
+        cd web-app && pnpm run test:e2e:live --reporter=list {{args}}
         EXIT_CODE=$?
     else
         echo "❌ VPS API tunnel failed"
@@ -136,20 +158,16 @@ test-e2e-ui-vps:
     if curl -sf http://localhost:8000/ping > /dev/null; then
         echo "✅ VPS API ready"
         echo "⚠️  Press Ctrl+C when done, then run: just test-e2e-vps-tunnel-stop"
-        cd web-app && pnpm run test:e2e:ui
+        cd web-app && pnpm run test:e2e:live:ui
     else
         echo "❌ Tunnel failed"
     fi
 
-# Run e2e tests (requires API at localhost:8000)
-test-e2e *args:
-    cd web-app && pnpm run test:e2e --reporter=list {{args}}
-
-# Interactive UI mode (requires API at localhost:8000)
+# Interactive UI mode for tiers A and B
 test-e2e-ui:
     cd web-app && pnpm run test:e2e:ui
 
-# Run e2e tests against production (no local API or tunnel needed)
+# Tier C against production (no local API or tunnel needed)
 test-e2e-prod *args:
     cd web-app && pnpm run test:e2e:prod --reporter=list {{args}}
 

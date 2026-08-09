@@ -8,6 +8,12 @@
 
 # testing
 /coverage
+# Playwright output. Two configs, so two sets: tiers A+B, then tier C.
+/playwright-report/
+/playwright-report-live/
+/test-results/
+/test-results-live/
+/.playwright/
 # Failure screenshots written by Vitest Browser Mode. Visual regression is not
 # in scope, so nothing here is a committed baseline.
 **/__screenshots__/
