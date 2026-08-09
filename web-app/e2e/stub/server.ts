@@ -1,5 +1,5 @@
 import { createMiddleware } from "@mswjs/http-middleware";
-import express, { type NextFunction, type Request, type Response } from "express";
+import express from "express";
 import { handlers } from "./handlers";
 
 /**
@@ -18,31 +18,15 @@ import { handlers } from "./handlers";
 
 const PORT = Number(process.env.STUB_PORT ?? 8787);
 
-/**
- * Reproduce the ASGI server's percent-decoding of the path *before* routing.
- *
- * `lib/api.ts` builds `/cards/search/${encodeURIComponent(text)}`, so a card
- * name containing `//` arrives as `%2F%2F`. Uvicorn decodes that into real
- * separators before FastAPI matches, at which point the `{text}` segment
- * (`[^/]+`) no longer matches and the request dies - issue #26.
- *
- * Express and MSW would both happily match the escaped form, so without this
- * the stub would answer 200 where the real API cannot, and #26 would be
- * invisible to every test that runs against the stub. A stub that is more
- * forgiving than the thing it stands in for is a false green generator.
- *
- * Delete this once #26 moves the search text into a query parameter - and
- * only then.
- */
-function decodePathSeparators(req: Request, _res: Response, next: NextFunction): void {
-  if (/%2f/i.test(req.url)) {
-    req.url = req.url.replace(/%2f/gi, "/");
-  }
-  next();
-}
+// The decodePathSeparators middleware that used to sit here reproduced the ASGI
+// server's percent-decoding of the path before routing, so that #26 stayed
+// visible through the stub instead of being papered over. #26 is fixed - the
+// search text is a `?q=` parameter now, never a path segment - so there is no
+// path left to decode, and its own comment said to delete it at exactly this
+// point. The principle it stood for still holds: a stub more forgiving than the
+// thing it stands in for is a false-green generator.
 
 const app = express();
-app.use(decodePathSeparators);
 app.use(createMiddleware(...handlers));
 
 app.listen(PORT, () => {

@@ -92,9 +92,10 @@ export function aggregate(source: SourceCard, id: string, printingOracleId?: str
     type_line: source.type_line ?? null,
     thumbnail: twoFaced ? null : thumbnails[0],
     faces_thumbnails: twoFaced ? thumbnails : null,
-    // Structurally null in production too: both ingestion tasks delete
-    // edhrec_rank before insert and CARD_PROJECTION projects neither rank.
-    edhrec_rank: null,
-    penny_rank: null,
+    // edhrec_rank/penny_rank used to be emitted as null here, mirroring
+    // production. They are gone from the contract entirely now: both ingestion
+    // tasks delete the field before insert and CARD_PROJECTION projected
+    // neither rank, so the aggregation could only ever produce null. The stub
+    // validates against the committed schema, so emitting them now fails.
   };
 }

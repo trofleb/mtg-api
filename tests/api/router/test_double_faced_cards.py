@@ -133,7 +133,7 @@ def test_search_results_carry_faces_thumbnails_too(double_faced_client):
     the modal renders ``CardDetails`` from it as well - so a face dropped
     here would be a face missing from the modal regardless of the component.
     """
-    response = double_faced_client.get("/cards/search/delver")
+    response = double_faced_client.get("/cards/search", params={"q": "delver"})
     assert response.status_code == 200, response.text
 
     delver = [

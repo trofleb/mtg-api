@@ -46,7 +46,10 @@ async function firstCardId(request: APIRequestContext): Promise<string> {
   // query string - and once a filter was active, the HTML-escaped "&amp;" with
   // it, which would have started sending malformed URLs from a spec whose whole
   // job is to tell a 404 from a 200.
-  const match = /href="\/card\/([^"/?]+)"/.exec(await response.text());
+  // The terminator has to accept `?` as well as `"`: excluding `?` from the
+  // capture alone was not enough, because the href no longer ends after the id
+  // and the pattern then matched nothing at all.
+  const match = /href="\/card\/([^"/?]+)["?]/.exec(await response.text());
   expect(match, "no card link on the homepage - is the API returning results?").not.toBeNull();
 
   return (match as RegExpExecArray)[1];

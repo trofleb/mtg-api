@@ -17,7 +17,9 @@ const cardIdsOn = async (page: Page): Promise<string[]> => {
   const hrefs = await page
     .locator('[data-testid="card-item"]')
     .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("href") ?? ""));
-  return hrefs.map((href) => href.replace("/card/", ""));
+  // Tiles append the originating search to the href (#39), so strip the query
+  // before comparing ids: href="/card/<id>?q=...".
+  return hrefs.map((href) => href.replace("/card/", "").split("?")[0]);
 };
 
 /**

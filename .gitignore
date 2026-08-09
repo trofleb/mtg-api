@@ -245,3 +245,7 @@ terraform.rc
 web-app/test-results/
 web-app/playwright-report/
 web-app/playwright/.cache/
+
+# Agent worktrees created by Claude Code workflows. Never committed: each is a
+# full checkout of this repo and git would record it as an embedded repository.
+.claude/

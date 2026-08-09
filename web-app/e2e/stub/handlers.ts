@@ -62,11 +62,14 @@ export const handlers = [
     guard(() => HttpResponse.json(validated("Sets", { sets: ALL_SETS })))
   ),
 
-  http.get(ANY_ORIGIN("/cards/search/:text"), ({ request, params }) =>
+  // ?q=, not a path segment. #26 moved the search text into a query parameter
+  // because %2F was decoded before routing, so FastAPI's {text} segment stopped
+  // matching and any card name containing "//" 500'd.
+  http.get(ANY_ORIGIN("/cards/search"), ({ request }) =>
     guard(() => {
       const url = new URL(request.url);
       const response = search({
-        text: String(params.text),
+        text: url.searchParams.get("q") ?? "",
         cursor: url.searchParams.get("cursor"),
         pageCount: asNumber(url.searchParams.get("page_count")),
         sets: url.searchParams.getAll("sets"),

@@ -27,7 +27,10 @@ test("both reversible cards are returned, with their own ids", async ({ page }) 
     nodes.map((node) => node.getAttribute("href") ?? "")
   );
 
-  expect(hrefs.sort()).toEqual(REVERSIBLE_CARD_IDS.map((id) => `/card/${id}`).sort());
+  // Compare ids, not whole hrefs: tiles append the originating search (#39), so
+  // the href is now `/card/<id>?q=...`. The id is what #22 is about.
+  const ids = hrefs.map((href) => href.replace("/card/", "").split("?")[0]);
+  expect(ids.sort()).toEqual([...REVERSIBLE_CARD_IDS].sort());
 });
 
 test("a reversible card's own page resolves", async ({ page }) => {

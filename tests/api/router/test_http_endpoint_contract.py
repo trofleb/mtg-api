@@ -43,7 +43,7 @@ def test_unknown_route_is_404(test_client):
 @pytest.mark.integration
 def test_search_returns_identified_cards(test_client):
     """Search returns a card list, and every card carries an id and a name."""
-    response = test_client.get("/cards/search/lightning bolt")
+    response = test_client.get("/cards/search", params={"q": "lightning bolt"})
 
     assert response.status_code == 200
 
@@ -59,7 +59,7 @@ def test_search_returns_identified_cards(test_client):
 @pytest.mark.integration
 def test_search_response_is_json(test_client):
     """The content type is what the client's `response.json()` assumes."""
-    response = test_client.get("/cards/search/test")
+    response = test_client.get("/cards/search", params={"q": "test"})
 
     assert response.headers["content-type"].startswith("application/json")
 
@@ -68,7 +68,7 @@ def test_search_response_is_json(test_client):
 def test_search_accepts_filters(test_client):
     """Filters are query parameters and never change the response shape."""
     response = test_client.get(
-        "/cards/search/dragon", params={"colors": "R", "types": "Creature"}
+        "/cards/search", params={"q": "dragon", "colors": "R", "types": "Creature"}
     )
 
     assert response.status_code == 200
@@ -83,7 +83,7 @@ def test_search_advertises_a_cursor_and_follows_it(test_client):
     request in ``if (firstData.has_more)``, so it reported a pass on data that
     never paged; here the query and page size are chosen so it always does.
     """
-    first = test_client.get("/cards/search/a", params={"page_count": 2})
+    first = test_client.get("/cards/search", params={"q": "a", "page_count": 2})
 
     assert first.status_code == 200
     first_page = first.json()
@@ -92,8 +92,8 @@ def test_search_advertises_a_cursor_and_follows_it(test_client):
     assert first_page["cursor"]
 
     second = test_client.get(
-        "/cards/search/a",
-        params={"page_count": 2, "cursor": first_page["cursor"]},
+        "/cards/search",
+        params={"q": "a", "page_count": 2, "cursor": first_page["cursor"]},
     )
 
     assert second.status_code == 200
@@ -108,7 +108,7 @@ def test_search_advertises_a_cursor_and_follows_it(test_client):
 @pytest.mark.integration
 def test_search_of_whitespace_does_not_500(test_client):
     """A blank query is a client mistake, so it must not read as a server one."""
-    response = test_client.get("/cards/search/ ")
+    response = test_client.get("/cards/search", params={"q": " "})
 
     assert response.status_code in (200, 404, 422)
 
@@ -142,7 +142,7 @@ def test_get_printing_by_scryfall_id(test_client):
     oracle id and would 404 here. The Playwright version of this test guarded
     the lookup with an `if` that was never true, so it asserted nothing.
     """
-    search = test_client.get("/cards/search/lightning bolt")
+    search = test_client.get("/cards/search", params={"q": "lightning bolt"})
     assert search.status_code == 200
 
     printings = search.json()["cards"][0]["cards"]

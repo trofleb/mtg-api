@@ -109,6 +109,9 @@ export function search(query: SearchQuery): SearchResponse {
 
   return {
     cards: page,
+    // The whole result set, not the page (#25). Required by the schema, and
+    // the ajv validator in validate.ts rejects the response without it.
+    total: ranked.length,
     has_more: hasMore,
     cursor: hasMore && last ? encodeCursor(last) : null,
   };
