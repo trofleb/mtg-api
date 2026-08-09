@@ -49,10 +49,12 @@ export function CardTile({ card, from }: CardTileProps) {
     >
       <CardContent className="p-0">
         <div className="relative aspect-[5/7] bg-muted">
+          {/* alt="" on purpose: the card name is in the heading just below, so
+              alt text here only makes a screen reader announce it twice. */}
           {thumbnail ? (
             <Image
               src={thumbnail}
-              alt={card.name || "Magic card"}
+              alt=""
               fill
               className="object-cover group-hover:scale-105 transition-transform"
               sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw"
@@ -65,9 +67,17 @@ export function CardTile({ card, from }: CardTileProps) {
         </div>
 
         <div className="p-3 space-y-2">
-          <h3 className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">{card.name}</h3>
+          {/* h2, not h3: app/page.tsx opens with the only h1 on the page and
+              there is nothing between, so h3 skipped a level. Heading level is
+              how a screen reader user navigates a long grid. */}
+          <h2 className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">{card.name}</h2>
 
-          <div className="flex items-center justify-between text-xs">
+          {/* Both of these are decorations, and both were being folded into the
+              link's accessible name - which is what a screen reader announces
+              and what a voice-control user has to say out loud. "{R}" is
+              Scryfall's mana notation rather than English, and the emoji's
+              meaning is already in the title attribute below it. */}
+          <div aria-hidden="true" className="flex items-center justify-between text-xs">
             {card.mana_cost && (
               <span className="text-muted-foreground truncate flex-1">{card.mana_cost}</span>
             )}

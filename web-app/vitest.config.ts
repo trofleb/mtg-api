@@ -52,6 +52,18 @@ export default defineConfig({
             "react/jsx-dev-runtime",
             "next/image",
             "next/link",
+            // Radix primitives, added when the first spec to render one
+            // (route-modal.browser.test.tsx) hit "Cannot read properties of
+            // null (reading 'useRef')" inside @radix-ui/react-dialog on the
+            // run that discovered it: the reload swapped React out from under
+            // a mounted tree. Listing them up front is the same reason the
+            // entries above are here.
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-scroll-area",
+            "@radix-ui/react-select",
+            "@radix-ui/react-slider",
+            "@radix-ui/react-slot",
+            "lucide-react",
           ],
         },
         test: {

@@ -3,7 +3,7 @@
 import { ChevronDown, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, BadgeRemoveButton } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -150,13 +150,11 @@ export function SearchForm({ sets, state }: SearchFormProps) {
                       {selectedSets.map((set) => (
                         <Badge key={set} variant="secondary">
                           {set}
-                          <button
-                            type="button"
+                          <BadgeRemoveButton
                             onClick={() => update({ sets: selectedSets.filter((s) => s !== set) })}
-                            className="ml-1 hover:text-destructive"
                           >
                             <X className="h-3 w-3" />
-                          </button>
+                          </BadgeRemoveButton>
                         </Badge>
                       ))}
                     </div>
