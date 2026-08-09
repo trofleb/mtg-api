@@ -109,7 +109,7 @@ def assert_valid_card_response(card: dict) -> None:
 def assert_valid_search_response(data: dict, min_cards: int = 0) -> None:
     """Validate the structure of a search endpoint response.
 
-    Validates responses from /cards/search/{text} endpoint.
+    Validates responses from /cards/search endpoint.
 
     Args:
         data: The response data dictionary to validate

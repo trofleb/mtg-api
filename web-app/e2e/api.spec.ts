@@ -25,7 +25,9 @@ test.describe("MTG API Endpoints", () => {
   });
 
   test("should search for cards by name", async ({ request }) => {
-    const response = await request.get(`${API_BASE_URL}/cards/search/lightning bolt`);
+    const response = await request.get(`${API_BASE_URL}/cards/search`, {
+      params: { q: "lightning bolt" },
+    });
 
     expect(response.ok()).toBeTruthy();
     expect(response.status()).toBe(200);
@@ -62,8 +64,9 @@ test.describe("MTG API Endpoints", () => {
   });
 
   test("should search with filters", async ({ request }) => {
-    const response = await request.get(`${API_BASE_URL}/cards/search/dragon`, {
+    const response = await request.get(`${API_BASE_URL}/cards/search`, {
       params: {
+        q: "dragon",
         colors: "R",
         types: "Creature",
       },
@@ -79,7 +82,9 @@ test.describe("MTG API Endpoints", () => {
 
   test("should support pagination with cursor", async ({ request }) => {
     // First request to get initial results
-    const firstResponse = await request.get(`${API_BASE_URL}/cards/search/dragon`);
+    const firstResponse = await request.get(`${API_BASE_URL}/cards/search`, {
+      params: { q: "dragon" },
+    });
 
     expect(firstResponse.ok()).toBeTruthy();
     const firstData = await firstResponse.json();
@@ -90,8 +95,9 @@ test.describe("MTG API Endpoints", () => {
 
     // If there are more results, test pagination
     if (firstData.has_more && firstData.cursor) {
-      const secondResponse = await request.get(`${API_BASE_URL}/cards/search/dragon`, {
+      const secondResponse = await request.get(`${API_BASE_URL}/cards/search`, {
         params: {
+          q: "dragon",
           cursor: firstData.cursor,
         },
       });
@@ -112,7 +118,9 @@ test.describe("MTG API Endpoints", () => {
     // Asserted unconditionally: the previous version wrapped this in an
     // `if (cards[0].id)` that was never true, so the test passed without
     // exercising anything.
-    const searchResponse = await request.get(`${API_BASE_URL}/cards/search/lightning bolt`);
+    const searchResponse = await request.get(`${API_BASE_URL}/cards/search`, {
+      params: { q: "lightning bolt" },
+    });
     expect(searchResponse.ok()).toBeTruthy();
 
     const searchData = await searchResponse.json();
@@ -138,14 +146,18 @@ test.describe("MTG API Endpoints", () => {
   });
 
   test("should return JSON content type for card endpoints", async ({ request }) => {
-    const response = await request.get(`${API_BASE_URL}/cards/search/test`);
+    const response = await request.get(`${API_BASE_URL}/cards/search`, {
+      params: { q: "test" },
+    });
 
     const contentType = response.headers()["content-type"];
     expect(contentType).toContain("application/json");
   });
 
   test("should handle empty search gracefully", async ({ request }) => {
-    const response = await request.get(`${API_BASE_URL}/cards/search/ `);
+    const response = await request.get(`${API_BASE_URL}/cards/search`, {
+      params: { q: " " },
+    });
 
     // Should either return 200 with empty results or 422 for validation error
     expect([200, 422, 404]).toContain(response.status());

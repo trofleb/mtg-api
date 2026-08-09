@@ -67,11 +67,11 @@ def test_image_uris_structure_complete(test_client):
 def test_search_response_structure(test_client):
     """Validate search response structure with cards, cursor, and has_more.
 
-    Tests that the /cards/search/{text} endpoint returns a properly
+    Tests that the /cards/search endpoint returns a properly
     structured response with aggregated cards by oracle_id.
     """
     # Search for "lightning"
-    response = test_client.get("/cards/search/lightning")
+    response = test_client.get("/cards/search?q=lightning")
     assert response.status_code == 200
 
     data = response.json()

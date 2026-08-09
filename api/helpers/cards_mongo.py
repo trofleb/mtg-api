@@ -39,6 +39,39 @@ def oracle_id_match(oracle_id: str) -> dict:
     }
 
 
+def count_matching_oracle_cards(collection, match_conditions: dict) -> int:
+    """Count the oracle cards a search matched, ignoring pagination.
+
+    Counted in oracle cards rather than printings because that is what a
+    page of results holds: the search pipeline groups printings by oracle
+    id, so counting matched documents would overcount every reprinted card.
+
+    Deliberately its own pipeline rather than a ``$facet``: it needs neither
+    the text score nor the full :data:`CARD_PROJECTION`, so projecting the
+    grouping key alone is far cheaper than materialising every group twice.
+
+    Args:
+        collection: Cards collection to aggregate over.
+        match_conditions: The same ``$match`` the page pipeline runs, so the
+            count describes exactly the search that produced the page.
+
+    Returns:
+        Number of distinct oracle cards matched; 0 when nothing matched.
+    """
+    counted = list(
+        collection.aggregate(
+            [
+                {"$match": match_conditions},
+                {"$project": {"oracle_id": ORACLE_ID}},
+                {"$group": {"_id": "$oracle_id"}},
+                {"$count": "total"},
+            ]
+        )
+    )
+    # $count emits no document at all for an empty input, rather than a zero.
+    return counted[0]["total"] if counted else 0
+
+
 CARD_PROJECTION = {
     "_id": 0,
     "id": 1,
@@ -100,6 +133,11 @@ CARD_PROJECTION = {
     "variation_of": 1,
     "security_stamp": 1,
     "watermark": 1,
+    # AGGREGATE_CARD runs after this projection, so its {"$max": "$penny_rank"}
+    # only sees a rank the projection carried through. It did not, so the
+    # field was null in every aggregated response ever served while both the
+    # response model and the clients went on declaring and rendering it.
+    "penny_rank": 1,
     # "preview_previewed_at": 1,
     # "preview_source_uri": 1,
     # "preview_source": 1,
@@ -122,7 +160,15 @@ AGGREGATE_CARD = {
     "rarity": {"$first": "$rarity"},
     "card_count": {"$sum": 1},
     "cards": {"$addToSet": "$$ROOT"},
-    "edhrec_rank": {"$max": "$edhrec_rank"},
+    # No edhrec_rank. Both ingestion paths delete it from the card before
+    # insert (tasks/fetch_dataset.py:123, tasks/ifetch_dataset.py:126) and
+    # write it to a separate dated collection instead - it is time-series
+    # data about a card, not a property of one. Grouping it here therefore
+    # produced null for every card ever returned. Restoring it would mean a
+    # $lookup with a latest-date sub-pipeline on every card page load, which
+    # is a real cost for a number nothing depends on; the honest move is to
+    # stop declaring it. penny_rank is a different case: it is still on the
+    # document, so it only needed projecting.
     "penny_rank": {"$max": "$penny_rank"},
     "thumbnail": {"$first": "$thumbnail"},
     "faces_thumbnails": {"$first": "$faces_thumbnails"},

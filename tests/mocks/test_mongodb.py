@@ -648,6 +648,45 @@ def test_text_search_matches_any_term():
 
 
 @pytest.mark.unit
+def test_count_stage_emits_one_document_naming_the_count():
+    """$count replaces the input with a single ``{name: n}`` document."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(collection.aggregate([{"$count": "total"}]))
+
+    assert results == [{"total": len(RELEVANCE_CARDS)}]
+
+
+@pytest.mark.unit
+def test_count_stage_counts_what_the_earlier_stages_left():
+    """It counts the pipeline's output, not the collection."""
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(
+        collection.aggregate([{"$match": {"name": "Shock"}}, {"$count": "matched"}])
+    )
+
+    assert results == [{"matched": 1}]
+
+
+@pytest.mark.unit
+def test_count_stage_emits_nothing_for_an_empty_input():
+    """An empty input yields an empty cursor, not a zero.
+
+    Worth pinning because it is the case a caller gets wrong: reading
+    ``results[0]["total"]`` works for every non-empty search and raises on
+    the one that found nothing.
+    """
+    collection = MockMongoCollection(RELEVANCE_CARDS)
+
+    results = list(
+        collection.aggregate([{"$match": {"name": "nonexistent"}}, {"$count": "total"}])
+    )
+
+    assert results == []
+
+
+@pytest.mark.unit
 def test_find_projection_supports_meta_text_score():
     """find() projections accept {"$meta": "textScore"} too."""
     collection = MockMongoCollection(RELEVANCE_CARDS)

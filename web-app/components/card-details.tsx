@@ -108,20 +108,18 @@ export function CardDetails({ card }: CardDetailsProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          {card.edhrec_rank !== undefined && (
-            <div>
-              <h3 className="font-semibold text-sm text-muted-foreground mb-1">EDHREC Rank</h3>
-              <p>#{card.edhrec_rank}</p>
-            </div>
-          )}
-          {card.penny_rank !== undefined && (
+        {/* EDHREC rank is gone from the response: the ingestion deletes it
+            from the card and stores it in a dated collection of its own, so
+            the API could only ever send null for it - and `!== undefined`
+            let that null through, rendering "#null" on every card. */}
+        {card.penny_rank != null && (
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <h3 className="font-semibold text-sm text-muted-foreground mb-1">Penny Rank</h3>
               <p>#{card.penny_rank}</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {card.cards && card.cards.length > 0 && (
           <div>

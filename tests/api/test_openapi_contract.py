@@ -24,7 +24,7 @@ AGGREGATED_PATH = "/cards/oracle/{oracle_id}/aggregated"
 
 CARD_PATHS = [
     "/cards/{name}",
-    "/cards/search/{text}",
+    "/cards/search",
     "/cards/id/{scryfall_id}",
     "/cards/oracle/{oracle_id}",
     AGGREGATED_PATH,
@@ -127,7 +127,7 @@ def test_search_results_require_an_id_too(openapi_spec):
     in a single null-keyed group that sorts first, which is the dead first
     tile in issue #22.
     """
-    schema = response_schema(openapi_spec, "/cards/search/{text}")
+    schema = response_schema(openapi_spec, "/cards/search")
     card = resolve(openapi_spec, schema["properties"]["cards"]["items"])
 
     assert "id" in card.get("required", []), (

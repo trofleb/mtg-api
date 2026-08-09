@@ -76,7 +76,13 @@ export async function searchCards(
   cursor?: string | null,
   filters?: CardFilter
 ): Promise<SearchResponse> {
+  // The search text is a query parameter, not a path segment. As a segment a
+  // name containing "//" was unroutable: encodeURIComponent produced %2F, the
+  // ASGI server decoded it back before routing, and FastAPI's {text} segment
+  // is [^/]+ so the route stopped matching. Split and transforming cards are
+  // all named that way, and this app renders those names itself (issue #26).
   const params = new URLSearchParams({
+    q: text,
     lang: "en",
     page_count: "20",
   });
@@ -129,15 +135,12 @@ export async function searchCards(
     }
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/cards/search/${encodeURIComponent(text)}?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/cards/search?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to search cards: ${response.statusText}`);

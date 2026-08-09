@@ -60,7 +60,7 @@ def test_search_returns_reversible_cards_with_non_null_ids(reversible_client):
     from this field, and ``normaliseCard``'s ``?? ""`` fallback turns a
     missing one into ``href="/card"``.
     """
-    response = reversible_client.get(f"/cards/search/{REVERSIBLE_SEARCH_TEXT}")
+    response = reversible_client.get(f"/cards/search?q={REVERSIBLE_SEARCH_TEXT}")
 
     assert response.status_code == 200, response.text
 
@@ -78,7 +78,7 @@ def test_two_reversible_cards_do_not_merge_into_one_result(reversible_client):
     Grouping on a field neither card has puts both in one ``None`` bucket,
     so one of the two silently vanishes from the results.
     """
-    response = reversible_client.get(f"/cards/search/{REVERSIBLE_SEARCH_TEXT}")
+    response = reversible_client.get(f"/cards/search?q={REVERSIBLE_SEARCH_TEXT}")
 
     assert response.status_code == 200, response.text
 
@@ -94,7 +94,7 @@ def test_reversible_cards_get_distinct_ids(reversible_client):
     Distinctness is what the grid's ``key={card.id}`` needs, and it is what
     makes the ``/card/{id}`` link land on the right card.
     """
-    response = reversible_client.get(f"/cards/search/{REVERSIBLE_SEARCH_TEXT}")
+    response = reversible_client.get(f"/cards/search?q={REVERSIBLE_SEARCH_TEXT}")
 
     assert response.status_code == 200, response.text
 
@@ -122,7 +122,7 @@ def test_search_id_resolves_through_the_aggregated_endpoint(reversible_client):
     an id that exists but resolves to nothing is still a dead tile - just a
     404 rather than a blank href.
     """
-    search = reversible_client.get(f"/cards/search/{REVERSIBLE_SEARCH_TEXT}")
+    search = reversible_client.get(f"/cards/search?q={REVERSIBLE_SEARCH_TEXT}")
     assert search.status_code == 200, search.text
 
     for card in search.json()["cards"]:
@@ -161,7 +161,7 @@ def test_reversible_card_printings_still_group_together(reversible_client):
     was there for: Lightning Bolt has two printings in the fixtures and must
     still come back as a single result carrying both.
     """
-    response = reversible_client.get("/cards/search/lightning")
+    response = reversible_client.get("/cards/search?q=lightning")
 
     assert response.status_code == 200, response.text
 

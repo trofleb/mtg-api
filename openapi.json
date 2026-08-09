@@ -226,6 +226,17 @@
             ],
             "title": "Oracle Text"
           },
+          "penny_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Penny Rank"
+          },
           "printed_name": {
             "anyOf": [
               {
@@ -462,17 +473,6 @@
             "description": "Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.",
             "title": "Colors"
           },
-          "edhrec_rank": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Edhrec Rank"
-          },
           "faces_thumbnails": {
             "anyOf": [
               {
@@ -584,11 +584,16 @@
           "has_more": {
             "title": "Has More",
             "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
           }
         },
         "required": [
           "cards",
-          "has_more"
+          "has_more",
+          "total"
         ],
         "title": "SearchResponse",
         "type": "object"
@@ -643,17 +648,6 @@
             ],
             "description": "Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.",
             "title": "Colors"
-          },
-          "edhrec_rank": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Edhrec Rank"
           },
           "faces_thumbnails": {
             "anyOf": [
@@ -896,7 +890,7 @@
     },
     "/cards/oracle/{oracle_id}/aggregated": {
       "get": {
-        "description": "Get a single card aggregated across all its printings, by Oracle ID.\n\n/cards/oracle/{oracle_id} returns the raw printings. This returns the same\ngrouped shape that /cards/search/{text} produces for each result, so a\ncard can be rendered on its own from an Oracle ID alone rather than only\nfrom a search result.\n\nArgs:\n    oracle_id: Oracle UUID representing the card concept\n    collection: MongoDB cards collection (injected dependency)\n\nReturns:\n    Aggregated card data, including every printing under \"cards\"\n\nRaises:\n    HTTPException: 404 if no cards found with this oracle_id",
+        "description": "Get a single card aggregated across all its printings, by Oracle ID.\n\n/cards/oracle/{oracle_id} returns the raw printings. This returns the same\ngrouped shape that /cards/search produces for each result, so a\ncard can be rendered on its own from an Oracle ID alone rather than only\nfrom a search result.\n\nArgs:\n    oracle_id: Oracle UUID representing the card concept\n    collection: MongoDB cards collection (injected dependency)\n\nReturns:\n    Aggregated card data, including every printing under \"cards\"\n\nRaises:\n    HTTPException: 404 if no cards found with this oracle_id",
         "operationId": "get_aggregated_card_by_oracle_id_cards_oracle__oracle_id__aggregated_get",
         "parameters": [
           {
@@ -934,16 +928,18 @@
         "summary": "Get Aggregated Card By Oracle Id"
       }
     },
-    "/cards/search/{text}": {
+    "/cards/search": {
       "get": {
-        "operationId": "search_card_by_text_cards_search__text__get",
+        "operationId": "search_card_by_text_cards_search_get",
         "parameters": [
           {
-            "in": "path",
-            "name": "text",
+            "description": "Full-text search query. A query parameter rather than a path segment because card names contain '//' - Fire // Ice, and every split or transforming card - and a path segment cannot carry one whatever the encoding (issue #26).",
+            "in": "query",
+            "name": "q",
             "required": true,
             "schema": {
-              "title": "Text",
+              "description": "Full-text search query. A query parameter rather than a path segment because card names contain '//' - Fire // Ice, and every split or transforming card - and a path segment cannot carry one whatever the encoding (issue #26).",
+              "title": "Q",
               "type": "string"
             }
           },

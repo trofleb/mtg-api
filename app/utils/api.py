@@ -32,26 +32,32 @@ def search_cards(
     Returns:
         Dict with 'cards', 'cursor', and 'has_more' keys
     """
-    filter_params = {}
+    # Every one of these is a query parameter on the endpoint, including the
+    # search text itself: as a path segment it could not carry a name
+    # containing "//" - Fire // Ice and every split card - because the ASGI
+    # server decodes %2F before routing (issue #26).
+    #
+    # The filters used to be sent as a JSON body, which the endpoint has never
+    # read, so none of them had any effect from this client.
+    params: dict = {"q": text, "cursor": cursor}
     if selected_sets:
-        filter_params["sets"] = selected_sets
+        params["sets"] = selected_sets
     if colors:
-        filter_params["colors"] = colors
-        filter_params["color_operator"] = color_operator
+        params["colors"] = colors
+        params["color_operator"] = color_operator
     if cmc_min is not None:
-        filter_params["cmc_min"] = cmc_min
+        params["cmc_min"] = cmc_min
     if cmc_max is not None:
-        filter_params["cmc_max"] = cmc_max
+        params["cmc_max"] = cmc_max
     if types:
-        filter_params["types"] = types
+        params["types"] = types
     if rarities:
-        filter_params["rarities"] = rarities
+        params["rarities"] = rarities
 
     try:
         response = get(
-            f"http://api:8000/cards/search/{text}",
-            params={"cursor": cursor},
-            json=filter_params if filter_params else None,
+            "http://api:8000/cards/search",
+            params=params,
             timeout=30,
         )
         response.raise_for_status()

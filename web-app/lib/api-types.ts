@@ -76,7 +76,7 @@ export interface paths {
      * @description Get a single card aggregated across all its printings, by Oracle ID.
      *
      *     /cards/oracle/{oracle_id} returns the raw printings. This returns the same
-     *     grouped shape that /cards/search/{text} produces for each result, so a
+     *     grouped shape that /cards/search produces for each result, so a
      *     card can be rendered on its own from an Oracle ID alone rather than only
      *     from a search result.
      *
@@ -99,7 +99,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/cards/search/{text}": {
+  "/cards/search": {
     parameters: {
       query?: never;
       header?: never;
@@ -107,7 +107,7 @@ export interface paths {
       cookie?: never;
     };
     /** Search Card By Text */
-    get: operations["search_card_by_text_cards_search__text__get"];
+    get: operations["search_card_by_text_cards_search_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -293,6 +293,8 @@ export interface components {
       oracle_id?: string | null;
       /** Oracle Text */
       oracle_text?: string | null;
+      /** Penny Rank */
+      penny_rank?: number | null;
       /** Printed Name */
       printed_name?: string | null;
       /** Promo */
@@ -355,8 +357,6 @@ export interface components {
        * @description Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.
        */
       colors?: string[] | null;
-      /** Edhrec Rank */
-      edhrec_rank?: number | null;
       /** Faces Thumbnails */
       faces_thumbnails?: string[] | null;
       /** Id */
@@ -385,6 +385,8 @@ export interface components {
       cursor?: string | null;
       /** Has More */
       has_more: boolean;
+      /** Total */
+      total: number;
     };
     /**
      * SearchResultCard
@@ -409,8 +411,6 @@ export interface components {
        * @description Colour codes. Normally W, U, B, R or G; colourless is usually an empty list, though some sources write the code C instead. Not validated against a fixed set - an unrecognised code is passed through rather than failing the response.
        */
       colors?: string[] | null;
-      /** Edhrec Rank */
-      edhrec_rank?: number | null;
       /** Faces Thumbnails */
       faces_thumbnails?: string[] | null;
       /** Id */
@@ -546,9 +546,11 @@ export interface operations {
       };
     };
   };
-  search_card_by_text_cards_search__text__get: {
+  search_card_by_text_cards_search_get: {
     parameters: {
-      query?: {
+      query: {
+        /** @description Full-text search query. A query parameter rather than a path segment because card names contain '//' - Fire // Ice, and every split or transforming card - and a path segment cannot carry one whatever the encoding (issue #26). */
+        q: string;
         lang?: string;
         cursor?: string | null;
         page_count?: number;
@@ -561,9 +563,7 @@ export interface operations {
         rarities?: string[];
       };
       header?: never;
-      path: {
-        text: string;
-      };
+      path?: never;
       cookie?: never;
     };
     requestBody?: never;

@@ -233,7 +233,7 @@ def test_get_aggregated_card_by_oracle_id_success(test_client):
 
     This test validates that:
     - Printings sharing an oracle_id collapse into a single document
-    - The shape matches what /cards/search/{text} returns per result,
+    - The shape matches what /cards/search returns per result,
       so a card can be rendered from an Oracle ID alone
     - Oracle-level fields are present, not just per-printing ones
     - Every printing is retained under "cards"

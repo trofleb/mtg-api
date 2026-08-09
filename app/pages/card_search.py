@@ -330,9 +330,9 @@ def show_card_details(card):
         if card.get("card_count"):
             st.write(f"**Printings:** {card['card_count']}")
 
-        # Rankings
-        if card.get("edhrec_rank"):
-            st.write(f"**EDHREC Rank:** #{card['edhrec_rank']}")
+        # Rankings. No EDHREC rank: the ingestion deletes it from the card and
+        # stores it in a dated collection of its own, so the API never sends
+        # one and this branch had never rendered.
         if card.get("penny_rank"):
             st.write(f"**Penny Rank:** #{card['penny_rank']}")
 

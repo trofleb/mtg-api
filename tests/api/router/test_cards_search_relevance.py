@@ -44,7 +44,9 @@ def test_search_ranks_exact_name_match_first(test_client):
     before Sol Ring's (f6a7b8c9...). So relevance order is the exact reverse
     of _id order and an _id fallback cannot rank Sol Ring first by accident.
     """
-    response = test_client.get("/cards/search/sol ring", params={"page_count": 10})
+    response = test_client.get(
+        "/cards/search", params={"q": "sol ring", "page_count": 10}
+    )
 
     assert response.status_code == 200
     names = [card["name"] for card in response.json()["cards"]]
@@ -63,7 +65,9 @@ def test_search_ranks_exact_name_match_first(test_client):
 @pytest.mark.integration
 def test_search_scores_are_populated_and_ordered(test_client):
     """Grouped results carry a real numeric score, ordered descending."""
-    response = test_client.get("/cards/search/instant", params={"page_count": 10})
+    response = test_client.get(
+        "/cards/search", params={"q": "instant", "page_count": 10}
+    )
 
     assert response.status_code == 200
     cards = response.json()["cards"]
@@ -90,7 +94,9 @@ def test_search_cursor_score_component_parses_as_float(test_client):
     The cursor is built as f"{score}:{id}". A null score stringifies to the
     literal "None", which float() cannot parse on the next request.
     """
-    response = test_client.get("/cards/search/instant", params={"page_count": 2})
+    response = test_client.get(
+        "/cards/search", params={"q": "instant", "page_count": 2}
+    )
 
     assert response.status_code == 200
     data = response.json()
@@ -111,14 +117,14 @@ def test_search_second_page_shares_no_ids_with_first(test_client):
     so this exercises the composite cursor's _id tie-break rather than only
     its score comparison.
     """
-    first = test_client.get("/cards/search/instant", params={"page_count": 2})
+    first = test_client.get("/cards/search", params={"q": "instant", "page_count": 2})
     assert first.status_code == 200
     page1 = first.json()
     assert page1["has_more"] is True
 
     second = test_client.get(
-        "/cards/search/instant",
-        params={"page_count": 2, "cursor": page1["cursor"]},
+        "/cards/search",
+        params={"q": "instant", "page_count": 2, "cursor": page1["cursor"]},
     )
     assert second.status_code == 200
     page2 = second.json()
@@ -158,7 +164,7 @@ def test_invalid_cursor_logs_a_warning(test_client, caplog, bad_cursor):
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="api.router.cards"):
         response = test_client.get(
-            "/cards/search/instant", params={"cursor": bad_cursor}
+            "/cards/search", params={"q": "instant", "cursor": bad_cursor}
         )
 
     assert response.status_code == 200

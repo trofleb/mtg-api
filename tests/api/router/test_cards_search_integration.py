@@ -1,4 +1,4 @@
-"""Integration tests for Cards Search endpoint (/cards/search/{text}).
+"""Integration tests for Cards Search endpoint (/cards/search?q=...).
 
 This module tests search endpoint functionality:
 - Full-text search functionality
@@ -23,7 +23,7 @@ import pytest
 
 @pytest.mark.integration
 def test_search_basic_text_query(test_client):
-    """Test /cards/search/{text} with basic text query (no filters).
+    """Test /cards/search?q= with basic text query (no filters).
 
     This validates:
     - Endpoint returns HTTP 200
@@ -35,7 +35,7 @@ def test_search_basic_text_query(test_client):
     Search: "lightning"
     Expected: Lightning Bolt (matches name)
     """
-    response = test_client.get("/cards/search/lightning")
+    response = test_client.get("/cards/search?q=lightning")
 
     assert response.status_code == 200
 
@@ -61,7 +61,7 @@ def test_search_matches_oracle_text(test_client):
     Search: "damage"
     Expected: Lightning Bolt ("deals 3 damage"), Izzet Charm ("deals 2 damage")
     """
-    response = test_client.get("/cards/search/damage")
+    response = test_client.get("/cards/search?q=damage")
 
     assert response.status_code == 200
 
@@ -86,7 +86,7 @@ def test_search_no_results(test_client):
     Search: "nonexistentcardxyz"
     Expected: Empty results
     """
-    response = test_client.get("/cards/search/nonexistentcardxyz")
+    response = test_client.get("/cards/search?q=nonexistentcardxyz")
 
     assert response.status_code == 200
 
@@ -112,7 +112,7 @@ def test_search_default_page_count(test_client):
 
     Note: With 12 sample cards, broad search should return 10 with has_more=True
     """
-    response = test_client.get("/cards/search/a")  # Very broad search
+    response = test_client.get("/cards/search?q=a")  # Very broad search
 
     assert response.status_code == 200
 
@@ -123,7 +123,7 @@ def test_search_default_page_count(test_client):
 @pytest.mark.integration
 def test_search_custom_page_count_5(test_client):
     """Test search with page_count=5."""
-    response = test_client.get("/cards/search/a", params={"page_count": 5})
+    response = test_client.get("/cards/search", params={"q": "a", "page_count": 5})
 
     assert response.status_code == 200
 
@@ -134,7 +134,7 @@ def test_search_custom_page_count_5(test_client):
 @pytest.mark.integration
 def test_search_custom_page_count_20(test_client):
     """Test search with page_count=20."""
-    response = test_client.get("/cards/search/a", params={"page_count": 20})
+    response = test_client.get("/cards/search", params={"q": "a", "page_count": 20})
 
     assert response.status_code == 200
 
@@ -150,7 +150,7 @@ def test_search_cursor_pagination(test_client):
     This ensures no duplicates or missing cards across pages.
     """
     # First page
-    response1 = test_client.get("/cards/search/a", params={"page_count": 3})
+    response1 = test_client.get("/cards/search", params={"q": "a", "page_count": 3})
     data1 = response1.json()
 
     assert len(data1["cards"]) == 3
@@ -164,7 +164,7 @@ def test_search_cursor_pagination(test_client):
         # Second page using cursor
         cursor = data1["cursor"]
         response2 = test_client.get(
-            "/cards/search/a", params={"page_count": 3, "cursor": cursor}
+            "/cards/search", params={"q": "a", "page_count": 3, "cursor": cursor}
         )
         data2 = response2.json()
 
@@ -179,7 +179,7 @@ def test_search_cursor_pagination(test_client):
 @pytest.mark.integration
 def test_search_has_more_flag_true(test_client):
     """Test has_more flag is True when more results exist."""
-    response = test_client.get("/cards/search/a", params={"page_count": 2})
+    response = test_client.get("/cards/search", params={"q": "a", "page_count": 2})
 
     assert response.status_code == 200
 
@@ -192,7 +192,9 @@ def test_search_has_more_flag_true(test_client):
 @pytest.mark.integration
 def test_search_has_more_flag_false(test_client):
     """Test has_more flag is False at end of results."""
-    response = test_client.get("/cards/search/emrakul", params={"page_count": 10})
+    response = test_client.get(
+        "/cards/search", params={"q": "emrakul", "page_count": 10}
+    )
 
     assert response.status_code == 200
 
@@ -209,7 +211,7 @@ def test_search_has_more_flag_false(test_client):
 @pytest.mark.integration
 def test_search_response_structure(test_client):
     """Test that search response has correct structure."""
-    response = test_client.get("/cards/search/lightning")
+    response = test_client.get("/cards/search?q=lightning")
 
     assert response.status_code == 200
 
@@ -254,7 +256,7 @@ def test_search_filter_colors_or_operator(test_client):
     """
     # Use query string to send multiple values for same parameter
     response = test_client.get(
-        "/cards/search/a?colors=R&colors=U&color_operator=or&page_count=20"
+        "/cards/search?q=a&colors=R&colors=U&color_operator=or&page_count=20"
     )
 
     assert response.status_code == 200
@@ -279,7 +281,7 @@ def test_search_filter_colors_and_operator(test_client):
     - Cards must contain both U and R
     """
     response = test_client.get(
-        "/cards/search/a?colors=U&colors=R&color_operator=and&page_count=20"
+        "/cards/search?q=a&colors=U&colors=R&color_operator=and&page_count=20"
     )
 
     assert response.status_code == 200
@@ -304,7 +306,7 @@ def test_search_filter_colors_exactly_operator(test_client):
     - Uses both $all and $size operators
     """
     response = test_client.get(
-        "/cards/search/a?colors=U&colors=R&color_operator=exactly&page_count=20"
+        "/cards/search?q=a&colors=U&colors=R&color_operator=exactly&page_count=20"
     )
 
     assert response.status_code == 200
@@ -326,7 +328,7 @@ def test_search_filter_cmc_min(test_client):
     - cmc_min parameter filters cards by converted mana cost
     - Only cards with CMC >= min are returned
     """
-    response = test_client.get("/cards/search/a?cmc_min=5&page_count=20")
+    response = test_client.get("/cards/search?q=a&cmc_min=5&page_count=20")
 
     assert response.status_code == 200
 
@@ -347,7 +349,7 @@ def test_search_filter_cmc_max(test_client):
     - cmc_max parameter filters cards by converted mana cost
     - Only cards with CMC <= max are returned
     """
-    response = test_client.get("/cards/search/a?cmc_max=2&page_count=20")
+    response = test_client.get("/cards/search?q=a&cmc_max=2&page_count=20")
 
     assert response.status_code == 200
 
@@ -368,7 +370,7 @@ def test_search_filter_cmc_range(test_client):
     - cmc_min and cmc_max work together
     - Only cards with min <= CMC <= max are returned
     """
-    response = test_client.get("/cards/search/a?cmc_min=1&cmc_max=5&page_count=20")
+    response = test_client.get("/cards/search?q=a&cmc_min=1&cmc_max=5&page_count=20")
 
     assert response.status_code == 200
 
@@ -390,7 +392,7 @@ def test_search_filter_types(test_client):
     - Uses case-insensitive regex matching
     - Cards matching ANY of the specified types are returned
     """
-    response = test_client.get("/cards/search/a?types=Creature&page_count=20")
+    response = test_client.get("/cards/search?q=a&types=Creature&page_count=20")
 
     assert response.status_code == 200
 
@@ -414,7 +416,7 @@ def test_search_filter_rarities(test_client):
     - Cards with ANY of the specified rarities are returned
     """
     response = test_client.get(
-        "/cards/search/a?rarities=rare&rarities=mythic&page_count=20"
+        "/cards/search?q=a&rarities=rare&rarities=mythic&page_count=20"
     )
 
     assert response.status_code == 200
@@ -440,7 +442,7 @@ def test_search_filter_sets(test_client):
     - set_name is in the individual card printings (cards array)
     """
     response = test_client.get(
-        "/cards/search/a?sets=Limited Edition Alpha&page_count=20"
+        "/cards/search?q=a&sets=Limited Edition Alpha&page_count=20"
     )
 
     assert response.status_code == 200
@@ -470,7 +472,7 @@ def test_search_filter_combined(test_client):
     - Cards must match ALL filter criteria
     """
     response = test_client.get(
-        "/cards/search/a?colors=U&color_operator=or&cmc_min=1&cmc_max=3&page_count=20"
+        "/cards/search?q=a&colors=U&color_operator=or&cmc_min=1&cmc_max=3&page_count=20"
     )
 
     assert response.status_code == 200

@@ -60,6 +60,37 @@ describe("parseSearchParams", () => {
     const { filters } = parseSearchParams({ cmc_min: "abc" });
     expect(filters.cmc_min).toBeUndefined();
   });
+
+  // Issue #28. cmc_min/cmc_max are declared int on the API, so a fractional
+  // bound comes back 422 - and because searchCards runs inside a server
+  // component, that 422 is rendered to the user as a 500 page rather than as
+  // a search. The slider only ever produces integers, so a fraction is a
+  // hand-edited or stale URL; round it rather than dropping the filter the
+  // URL plainly asks for.
+  it("rounds a fractional cmc bound to the integer the API accepts", () => {
+    const { filters } = parseSearchParams({ cmc_min: "1.5", cmc_max: "5.2" });
+    expect(filters.cmc_min).toBe(2);
+    expect(filters.cmc_max).toBe(5);
+    expect(Number.isInteger(filters.cmc_min)).toBe(true);
+    expect(Number.isInteger(filters.cmc_max)).toBe(true);
+  });
+
+  it("never emits a non-integer cmc bound, whatever the URL says", () => {
+    for (const raw of ["0.1", "3.9", "-2.5", "1e2.5", "15.999"]) {
+      const { filters } = parseSearchParams({ cmc_min: raw, cmc_max: raw });
+      for (const value of [filters.cmc_min, filters.cmc_max]) {
+        if (value !== undefined) expect(Number.isInteger(value)).toBe(true);
+      }
+    }
+  });
+
+  // 0.4 rounds to 0, which is CMC_MIN, so the bound stops narrowing the range
+  // and is dropped - the same treatment "0" already gets.
+  it("drops a fraction that rounds back onto the full range", () => {
+    const { filters } = parseSearchParams({ cmc_min: "0.4", cmc_max: "15.7" });
+    expect(filters.cmc_min).toBeUndefined();
+    expect(filters.cmc_max).toBeUndefined();
+  });
 });
 
 describe("buildSearchParams", () => {

@@ -4,7 +4,7 @@ This module provides in-memory mock implementations of MongoDB cursor and
 collection classes, enabling fast integration tests without external dependencies.
 
 Supports MongoDB query operators: $regex, $in, $nin, $all, $size, $gte, $lte, $text, $search, $or, $and, $exists, $eq
-Supports aggregation stages: $match, $project, $group, $sort, $limit
+Supports aggregation stages: $match, $project, $group, $sort, $limit, $count
 Supports projection expressions: {"$meta": "textScore"}, "$dotted.path",
 {"$ifNull": [...]}, {"$arrayElemAt": [...]}
 
@@ -476,6 +476,12 @@ class MockMongoCollection:
         elif stage_type == "$limit":
             # Limit documents
             return documents[:stage_spec]
+
+        elif stage_type == "$count":
+            # MongoDB emits a single document naming the count, and emits
+            # *nothing* when the input is empty - so a caller has to handle
+            # the empty cursor rather than reading a zero off a document.
+            return [{stage_spec: len(documents)}] if documents else []
 
         else:
             # Unsupported stage - return as is

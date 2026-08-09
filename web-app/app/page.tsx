@@ -51,12 +51,13 @@ export default async function Home({ searchParams }: HomeProps) {
 
           {results.cards.length > 0 && (
             <div className="flex items-center justify-between">
+              {/* The API counts the whole result set, so this is the real
+                  number rather than "however many are on this page, plus".
+                  It used to read results.cards.length + "+" when has_more,
+                  which said "20+ results found" on every page of every
+                  search - and on the last page too (issue #25). */}
               <p className="text-sm text-muted-foreground">
-                <strong>
-                  {results.cards.length}
-                  {results.has_more ? "+" : ""}
-                </strong>{" "}
-                results found
+                <strong>{results.total}</strong> {results.total === 1 ? "result" : "results"} found
               </p>
             </div>
           )}

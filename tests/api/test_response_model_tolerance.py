@@ -48,7 +48,7 @@ def serve():
             "printing": client.get(f"/cards/id/{card['id']}"),
             "printings": client.get(f"/cards/oracle/{card['oracle_id']}"),
             "aggregated": client.get(f"/cards/{card['name_search']}"),
-            "search": client.get(f"/cards/search/{card['name_search']}"),
+            "search": client.get("/cards/search", params={"q": card["name_search"]}),
         }
 
     yield make

@@ -5,6 +5,11 @@ INDEX_BASE = [
     # IndexModel([("card_faces.object", ASCENDING)]),
     IndexModel([("id", HASHED)]),
     IndexModel([("oracle_id", HASHED)]),
+    # A reversible_card carries no top-level oracle_id - Scryfall puts one on
+    # each face - so api.helpers.cards_mongo.oracle_id_match looks in both
+    # places with an $or. Without this the second branch is a collection scan
+    # on every card page load, whatever the layout of the card requested.
+    IndexModel([("card_faces.oracle_id", ASCENDING)]),
     IndexModel([("multiverse_ids", ASCENDING)]),
     # IndexModel([("mtgo_id", HASHED)]),
     IndexModel([("arena_id", HASHED)]),

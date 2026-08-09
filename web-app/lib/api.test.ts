@@ -39,7 +39,7 @@ describe("api", () => {
 
       expect(mockFetch).toHaveBeenCalledOnce();
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/cards/search/Black%20Lotus"),
+        expect.stringContaining("/cards/search?"),
         expect.objectContaining({
           method: "GET",
           headers: {
@@ -47,6 +47,7 @@ describe("api", () => {
           },
         })
       );
+      expect(mockFetch.mock.calls[0][0]).toContain("q=Black+Lotus");
       expect(result).toEqual({
         cards: [
           {
@@ -59,6 +60,25 @@ describe("api", () => {
         cursor: null,
         has_more: false,
       });
+    });
+
+    // Issue #26. The text used to be a path segment, so a name containing
+    // "//" produced %2F, which the ASGI server decoded back into separators
+    // before routing - and FastAPI's {text} segment is [^/]+, so the route
+    // stopped matching. Every split and transforming card is named this way,
+    // and the app renders those names itself.
+    it("sends the search text as a query parameter, not a path segment", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ cards: [], cursor: null, has_more: false }),
+      });
+
+      await searchCards("Fire // Ice");
+
+      const callUrl: string = mockFetch.mock.calls[0][0];
+      const url = new URL(callUrl);
+      expect(url.pathname).toBe("/cards/search");
+      expect(url.searchParams.get("q")).toBe("Fire // Ice");
     });
 
     it("uses id when the API provides it", async () => {
@@ -132,6 +152,25 @@ describe("api", () => {
 
       expect(warn).not.toHaveBeenCalled();
       warn.mockRestore();
+    });
+
+    // Issue #25. The page renders this instead of counting the array it was
+    // handed, so it has to survive normaliseCard's rebuild of the response.
+    it("passes the whole-result-set total through", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [{ id: "oracle-1", name: "Lightning Bolt" }],
+          cursor: "0.9:oracle-1",
+          has_more: true,
+          total: 137,
+        }),
+      });
+
+      const result = await searchCards("bolt");
+
+      expect(result.total).toBe(137);
+      expect(result.cards).toHaveLength(1);
     });
 
     it("should include cursor parameter when provided", async () => {

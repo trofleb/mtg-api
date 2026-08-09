@@ -17,7 +17,7 @@ def test_colorless_cards_with_exactly_operator(test_client):
     for colorless cards with the 'exactly' operator works correctly.
     """
     # Search for colorless cards using empty colors with "exactly" operator
-    response = test_client.get("/cards/search/lotus?color_operator=exactly")
+    response = test_client.get("/cards/search?q=lotus&color_operator=exactly")
     assert response.status_code == 200
 
     data = response.json()
@@ -43,8 +43,8 @@ def test_five_color_cards_with_exactly_operator(test_client):
     """
     # Search for five-color cards with all 5 colors and "exactly" operator
     response = test_client.get(
-        "/cards/search/progenitus"
-        "?colors=W&colors=U&colors=B&colors=R&colors=G"
+        "/cards/search?q=progenitus"
+        "&colors=W&colors=U&colors=B&colors=R&colors=G"
         "&color_operator=exactly"
     )
     assert response.status_code == 200
@@ -73,7 +73,7 @@ def test_cmc_zero_cards(test_client):
     with CMC filtering.
     """
     # Search for CMC 0 cards
-    response = test_client.get("/cards/search/lotus?cmc_min=0&cmc_max=0")
+    response = test_client.get("/cards/search?q=lotus&cmc_min=0&cmc_max=0")
     assert response.status_code == 200
 
     data = response.json()
@@ -95,7 +95,7 @@ def test_very_high_cmc_cards(test_client):
     with CMC filtering.
     """
     # Search for CMC 15+ cards
-    response = test_client.get("/cards/search/emrakul?cmc_min=15")
+    response = test_client.get("/cards/search?q=emrakul&cmc_min=15")
     assert response.status_code == 200
 
     data = response.json()
@@ -145,7 +145,7 @@ def test_special_characters_in_search_query(test_client):
     ]
 
     for query in special_queries:
-        response = test_client.get(f"/cards/search/{query}")
+        response = test_client.get("/cards/search", params={"q": query})
 
         # Should not crash - returns 200 with results, 200 with empty results, or 404 not found
         # The key is it shouldn't return 500 (server error)
@@ -178,7 +178,7 @@ def test_database_connection_error_handling(test_client_empty):
     # Using the empty collection fixture, which might not have all operations
     # For now, just verify that endpoints return proper responses even with empty data
 
-    response = test_client_empty.get("/cards/search/nonexistent")
+    response = test_client_empty.get("/cards/search?q=nonexistent")
     assert response.status_code == 200
 
     data = response.json()

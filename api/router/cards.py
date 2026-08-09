@@ -3,9 +3,17 @@ from typing import Annotated, Optional
 
 from fastapi import HTTPException, Query
 from fastapi.routing import APIRouter
-from unidecode import unidecode
 
-from api.helpers.cards_mongo import AGGREGATE_CARD, CARD_PROJECTION, oracle_id_match
+from api.helpers.cards_cursor import CURSOR_FORMAT, cursor_match, decode_cursor
+from api.helpers.cards_lookup import (
+    find_aggregated_cards_by_oracle_id,
+    find_cards_by_name,
+    find_printing_by_scryfall_id,
+    find_printings_by_oracle_id,
+)
+from api.helpers.cards_mongo import count_matching_oracle_cards
+from api.helpers.cards_response import build_search_page, expose_id
+from api.helpers.cards_search import build_search_match, build_search_pipeline
 from api.helpers.database import CardsCollection
 from api.models.cards import CardPrinting, OracleCard, SearchResponse
 
@@ -14,63 +22,54 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _expose_id(card: dict) -> dict:
-    """Rename an aggregated card's "_id" to "id".
+def _resume_filter(cursor: Optional[str], q: str) -> Optional[dict]:
+    """Turn a client's cursor into a resume condition, or say why it can't.
 
-    Grouping by oracle_id forces the key onto "_id", which is a MongoDB
-    detail rather than part of this API. The OracleCard response model
-    declares "id" and requires it, so this is now how the pipeline meets
-    that contract rather than being the contract itself.
+    An unusable cursor serves the first page, which is a pagination loop from
+    the client's side - so it is worth a line in the logs rather than an HTTP
+    200 and silence (issue #24). Kept in the route because that is where the
+    request context worth naming lives.
+
+    Args:
+        cursor: Cursor the client sent back, or None for the first page.
+        q: The search it was sent for, so the warning names it.
+
+    Returns:
+        The ``$match`` resuming after the cursor, or None for the first page.
     """
-    if "_id" in card:
-        card["id"] = card.pop("_id")
-    return card
+    if not cursor:
+        return None
 
-
-@router.get("/cards/{name}", response_model=OracleCard)
-def search_card_by_name(
-    name: str,
-    collection: CardsCollection,
-    lang: str = "en",
-    set: Optional[str] = None,
-):
-    search_name = unidecode(name).lower()
-    results = [
-        card
-        for card in collection.aggregate(
-            [
-                {
-                    "$match": {
-                        "name_search": {
-                            "$regex": f"^{search_name}",
-                        },
-                    }
-                },
-                {"$project": CARD_PROJECTION},
-                {"$sort": {"released_at": -1}},
-                {
-                    "$match": {
-                        "lang": {"$eq": lang},
-                        "layout": {
-                            "$nin": ["art_series"],
-                        },
-                        "set": ({"$eq": set.lower()} if set else {"$exists": True}),
-                    }
-                },
-                {"$group": AGGREGATE_CARD},
-            ]
+    decoded = decode_cursor(cursor)
+    if decoded is None:
+        logger.warning(
+            'Ignoring malformed pagination cursor %r for search "%s"; '
+            'expected "%s". Serving the first page.',
+            cursor,
+            q,
+            CURSOR_FORMAT,
         )
-    ]
+        return None
 
-    if len(results) == 0:
-        raise HTTPException(status_code=404, detail=f"Card {name} not found")
-
-    return _expose_id(results[0])
+    return cursor_match(*decoded)
 
 
-@router.get("/cards/search/{text}", response_model=SearchResponse)
+# Registered before /cards/{name}: both are a single segment below /cards/
+# and FastAPI matches in declaration order, so the other way round this route
+# would be unreachable and every search would 404 as "Card search not found".
+@router.get("/cards/search", response_model=SearchResponse)
 def search_card_by_text(
-    text: str,
+    q: Annotated[
+        str,
+        Query(
+            description=(
+                "Full-text search query. A query parameter rather than a path "
+                "segment because card names contain '//' - Fire // Ice, and "
+                "every split or transforming card - and a path segment cannot "
+                "carry one whatever the encoding (issue #26)."
+            )
+        ),
+    ],
     collection: CardsCollection,
     lang: str = "en",
     cursor: Optional[str] = None,
@@ -83,123 +82,33 @@ def search_card_by_text(
     types: Annotated[list[str], Query()] = [],
     rarities: Annotated[list[str], Query()] = [],
 ):
-    # Build match conditions
-    match_conditions = {
-        "$text": {
-            "$search": text,
-            "$caseSensitive": False,
-            "$diacriticSensitive": False,
-        },
-        "lang": {"$eq": lang},
-    }
+    # Positional, in the same order as this route's own signature.
+    match_conditions = build_search_match(
+        q, lang, sets, colors, color_operator, cmc_min, cmc_max, types, rarities
+    )
+    pipeline = build_search_pipeline(
+        match_conditions, page_count, cursor_filter=_resume_filter(cursor, q)
+    )
 
-    # Add set filter
-    if sets:
-        match_conditions["set_name"] = {"$in": sets}
-
-    # Add color filter
-    if colors:
-        if color_operator == "exactly":
-            # Exactly these colors (no more, no less)
-            match_conditions["colors"] = {
-                "$all": colors,
-                "$size": len(colors),
-            }
-        elif color_operator == "and":
-            # Contains all these colors (may have more)
-            match_conditions["colors"] = {"$all": colors}
-        else:  # "or" - default
-            # Contains any of these colors
-            match_conditions["colors"] = {"$in": colors}
-
-    # Add CMC filter
-    if cmc_min is not None or cmc_max is not None:
-        cmc_filter = {}
-        if cmc_min is not None:
-            cmc_filter["$gte"] = cmc_min
-        if cmc_max is not None:
-            cmc_filter["$lte"] = cmc_max
-        match_conditions["cmc"] = cmc_filter
-
-    # Add type filter (checks if type_line contains any of the specified types)
-    if types:
-        # Case-insensitive regex for type matching
-        type_patterns = [{"type_line": {"$regex": t, "$options": "i"}} for t in types]
-        match_conditions["$or"] = type_patterns
-
-    # Add rarity filter
-    if rarities:
-        match_conditions["rarity"] = {"$in": rarities}
-
-    # Build aggregation pipeline
-    pipeline = [
-        {"$match": match_conditions},
-        # "score": 1 would project each document's own "score" field, which
-        # card documents do not have. Only {"$meta": "textScore"} asks for the
-        # $text relevance score, without which every document ties at null and
-        # the $sort below degenerates to _id ascending.
-        {"$project": {"score": {"$meta": "textScore"}, **CARD_PROJECTION}},
-        {"$group": {"score": {"$max": "$score"}, **AGGREGATE_CARD}},
-        {
-            "$sort": {"score": -1, "_id": 1}
-        },  # Sort by score DESC, then _id ASC for consistency
-    ]
-
-    # Add cursor filter if provided
-    if cursor:
-        # Cursor format: "score:oracle_id"
-        try:
-            cursor_score, cursor_id = cursor.split(":", 1)
-            cursor_score = float(cursor_score)
-            # Match documents with score < cursor_score OR (score == cursor_score AND _id > cursor_id)
-            pipeline.append(
-                {
-                    "$match": {
-                        "$or": [
-                            {"score": {"$lt": cursor_score}},
-                            {
-                                "$and": [
-                                    {"score": cursor_score},
-                                    {"_id": {"$gt": cursor_id}},
-                                ]
-                            },
-                        ]
-                    }
-                }
-            )
-        except (ValueError, IndexError):
-            # An unusable cursor is served as if it were the first page. That
-            # is a pagination loop from the client's side, so say so rather
-            # than returning 200 with nothing in the logs.
-            logger.warning(
-                'Ignoring malformed pagination cursor %r for search "%s"; '
-                'expected "<score>:<oracle_id>". Serving the first page.',
-                cursor,
-                text,
-            )
-
-    # Add limit
-    pipeline.append({"$limit": page_count + 1})
-
-    # Execute aggregation
     results = list(collection.aggregate(pipeline))
+    total = count_matching_oracle_cards(collection, match_conditions)
 
-    # Build pagination result
-    # One extra document was fetched purely to detect a further page.
-    page = [_expose_id(card) for card in results[:page_count]]
-    has_more = len(results) > page_count
+    return build_search_page(results, page_count, total)
 
-    # The cursor points at the last card of this page. Its "id" is the
-    # grouping key, which the pipeline's cursor filter matches as "_id".
-    result = {
-        "cards": page,
-        "cursor": (
-            f"{page[-1]['score']}:{page[-1]['id']}" if has_more and page else None
-        ),
-        "has_more": has_more,
-    }
 
-    return result
+@router.get("/cards/{name}", response_model=OracleCard)
+def search_card_by_name(
+    name: str,
+    collection: CardsCollection,
+    lang: str = "en",
+    set: Optional[str] = None,
+):
+    results = find_cards_by_name(collection, name, lang, set)
+
+    if len(results) == 0:
+        raise HTTPException(status_code=404, detail=f"Card {name} not found")
+
+    return expose_id(results[0])
 
 
 @router.get("/cards/id/{scryfall_id}", response_model=CardPrinting)
@@ -217,8 +126,7 @@ def get_card_by_scryfall_id(scryfall_id: str, collection: CardsCollection):
         HTTPException: 404 if card not found
     """
 
-    # Query MongoDB for card by Scryfall ID
-    card = collection.find_one({"id": scryfall_id}, CARD_PROJECTION)
+    card = find_printing_by_scryfall_id(collection, scryfall_id)
 
     if card is None:
         raise HTTPException(
@@ -243,14 +151,7 @@ def get_cards_by_oracle_id(oracle_id: str, collection: CardsCollection):
         HTTPException: 404 if no cards found with this oracle_id
     """
 
-    # Query MongoDB for all cards with this Oracle ID. A reversible card
-    # carries its oracle ids on the faces rather than the document, so the
-    # lookup has to check both places.
-    cards = list(
-        collection.find(oracle_id_match(oracle_id), CARD_PROJECTION).sort(
-            "released_at", -1
-        )
-    )
+    cards = find_printings_by_oracle_id(collection, oracle_id)
 
     if not cards:
         raise HTTPException(
@@ -265,7 +166,7 @@ def get_aggregated_card_by_oracle_id(oracle_id: str, collection: CardsCollection
     """Get a single card aggregated across all its printings, by Oracle ID.
 
     /cards/oracle/{oracle_id} returns the raw printings. This returns the same
-    grouped shape that /cards/search/{text} produces for each result, so a
+    grouped shape that /cards/search produces for each result, so a
     card can be rendered on its own from an Oracle ID alone rather than only
     from a search result.
 
@@ -280,21 +181,11 @@ def get_aggregated_card_by_oracle_id(oracle_id: str, collection: CardsCollection
         HTTPException: 404 if no cards found with this oracle_id
     """
 
-    results = [
-        card
-        for card in collection.aggregate(
-            [
-                {"$match": oracle_id_match(oracle_id)},
-                {"$project": CARD_PROJECTION},
-                {"$sort": {"released_at": -1}},
-                {"$group": AGGREGATE_CARD},
-            ]
-        )
-    ]
+    results = find_aggregated_cards_by_oracle_id(collection, oracle_id)
 
     if not results:
         raise HTTPException(
             status_code=404, detail=f"No cards found with Oracle ID {oracle_id}"
         )
 
-    return _expose_id(results[0])
+    return expose_id(results[0])

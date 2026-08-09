@@ -99,6 +99,7 @@ class CardPrinting(BaseModel):
     watermark: Optional[str] = None
     # Derived by the projection rather than taken from Scryfall: the image
     # sizes clients actually render, lifted out of image_uris / card_faces.
+    penny_rank: Optional[int] = None
     thumbnail: Optional[str] = None
     faces_thumbnails: Optional[list[str]] = None
     image: Optional[str] = None
@@ -127,7 +128,9 @@ class OracleCard(BaseModel):
     cmc: Optional[float] = None
     colors: Optional[list[str]] = Field(default=None, description=COLOR_DESCRIPTION)
     rarity: Optional[str] = None
-    edhrec_rank: Optional[int] = None
+    # No edhrec_rank: the ingestion deletes it from the card and writes it to
+    # a dated collection of its own, so the aggregation could only ever emit
+    # null for it. See the comment on AGGREGATE_CARD.
     penny_rank: Optional[int] = None
     thumbnail: Optional[str] = None
     faces_thumbnails: Optional[list[str]] = None
@@ -151,3 +154,10 @@ class SearchResponse(BaseModel):
     cards: list[SearchResultCard]
     cursor: Optional[str] = None
     has_more: bool
+    # How many oracle cards the search matched in total, not how many are on
+    # this page. The page array cannot answer that question, so the client
+    # was reduced to reporting "20+ results found" on every page of every
+    # search - including the last one (issue #25). Counted in oracle cards to
+    # match what the page holds: the pipeline groups printings by oracle id,
+    # so counting printings would overcount every reprinted card.
+    total: int

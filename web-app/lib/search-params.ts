@@ -23,11 +23,21 @@ function toArray(value: string | string[] | undefined): string[] {
   return Array.isArray(value) ? value : [value];
 }
 
-function toNumber(value: string | string[] | undefined): number | undefined {
+/**
+ * Read a CMC bound as the integer the API will accept.
+ *
+ * cmc_min and cmc_max are declared `int` on the endpoint, so a fractional
+ * bound comes back 422 - and since searchCards runs inside a server
+ * component, that 422 surfaces to the user as a 500 page instead of a
+ * search (issue #28). The slider only ever produces integers, so a fraction
+ * here means a hand-edited or stale URL: round it rather than discard a
+ * filter the URL plainly asks for.
+ */
+function toIntegerBound(value: string | string[] | undefined): number | undefined {
   const raw = Array.isArray(value) ? value[0] : value;
   if (raw === undefined || raw === "") return undefined;
   const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return Number.isFinite(parsed) ? Math.round(parsed) : undefined;
 }
 
 function first(value: string | string[] | undefined): string | undefined {
@@ -41,8 +51,8 @@ export function parseSearchParams(params: RawSearchParams): SearchState {
   const types = toArray(params.types);
   const rarities = toArray(params.rarities);
 
-  const cmcMin = toNumber(params.cmc_min);
-  const cmcMax = toNumber(params.cmc_max);
+  const cmcMin = toIntegerBound(params.cmc_min);
+  const cmcMax = toIntegerBound(params.cmc_max);
 
   const colorOperator = first(params.color_operator);
   const isOperator =

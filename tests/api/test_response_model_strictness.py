@@ -41,11 +41,16 @@ RESPONSE_MODELS = (CardPrinting, OracleCard, SearchResultCard, SearchResponse)
 #                           branch that guarantees it.
 #   card_count / cards    - computed by the $group, never absent.
 #   has_more              - computed by the handler, never absent.
+#   total                 - likewise: a $count the handler always runs and
+#                           defaults to 0 on an empty cursor, so there is no
+#                           document that can fail to carry it. Optional
+#                           would push the "is it there?" question onto every
+#                           client, which is the ambiguity issue #25 was.
 EXPECTED_REQUIRED = {
     CardPrinting: {"id", "name"},
     OracleCard: {"id", "name", "card_count", "cards"},
     SearchResultCard: {"id", "name", "card_count", "cards"},
-    SearchResponse: {"cards", "has_more"},
+    SearchResponse: {"cards", "has_more", "total"},
 }
 
 
