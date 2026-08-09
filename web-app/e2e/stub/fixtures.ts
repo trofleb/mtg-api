@@ -1,5 +1,6 @@
 import type { components } from "../../lib/api-types";
 import reversibleDocument from "./data/reversible-cards.json";
+import { aggregate, type SourceCard } from "./projection";
 
 /**
  * Deterministic fixtures for the API stub.
@@ -12,30 +13,12 @@ import reversibleDocument from "./data/reversible-cards.json";
  * a shape a generator cannot produce: a *missing* field, stable ids across
  * two pages, a specific status for a specific id. See "The stub: generated
  * contract, hand-written fixtures" in fix-ui-issues.md.
+ *
+ * The projection from source document to API response lives in
+ * `projection.ts`.
  */
 
 type OracleCard = components["schemas"]["OracleCard"];
-type CardPrinting = components["schemas"]["CardPrinting"];
-
-/** A Scryfall document as it sits in Mongo, before any projection. */
-interface SourceCard {
-  id: string;
-  name: string;
-  lang?: string;
-  layout?: string;
-  cmc?: number;
-  type_line?: string;
-  oracle_text?: string;
-  mana_cost?: string;
-  colors?: string[];
-  color_identity?: string[];
-  rarity?: string;
-  set?: string;
-  set_name?: string;
-  artist?: string;
-  released_at?: string;
-  card_faces?: { name: string; oracle_id?: string; image_uris?: Record<string, string> }[];
-}
 
 const REVERSIBLE_SOURCE = reversibleDocument.cards as SourceCard[];
 
@@ -49,72 +32,6 @@ export const REVERSIBLE_SEARCH_TEXT: string = reversibleDocument.search_text;
  * (rejected before lookup) and the not-found page would never be exercised.
  */
 export const BOGUS_CARD_ID = "00000000-0000-4000-8000-000000000000";
-
-function thumbnailsOf(source: SourceCard): string[] {
-  const faces = source.card_faces ?? [];
-  if (faces.length > 0) {
-    return faces.map((face, i) => face.image_uris?.normal ?? `${source.id}-face-${i}.jpg`);
-  }
-  return [`https://cards.scryfall.io/normal/${source.id}.jpg`];
-}
-
-/**
- * Project one printing the way `CARD_PROJECTION` does.
- *
- * `oracleId` is optional and the key is omitted when it is absent, not set to
- * null: a `reversible_card` has no top-level oracle_id in Scryfall's data at
- * all, and that absence is the whole of #22.
- */
-function printing(source: SourceCard, oracleId: string | undefined): CardPrinting {
-  const faces = source.card_faces ?? [];
-  const thumbnails = thumbnailsOf(source);
-
-  return {
-    id: source.id,
-    name: source.name,
-    ...(oracleId === undefined ? {} : { oracle_id: oracleId }),
-    lang: source.lang ?? "en",
-    layout: source.layout ?? "normal",
-    cmc: source.cmc ?? 0,
-    type_line: source.type_line ?? null,
-    oracle_text: source.oracle_text ?? null,
-    mana_cost: source.mana_cost ?? null,
-    colors: source.colors ?? [],
-    color_identity: source.color_identity ?? source.colors ?? [],
-    rarity: source.rarity ?? "common",
-    set: source.set ?? "tst",
-    set_name: source.set_name ?? "Test Set",
-    artist: source.artist ?? null,
-    released_at: source.released_at ?? null,
-    thumbnail: faces.length > 1 ? null : thumbnails[0],
-    faces_thumbnails: faces.length > 1 ? thumbnails : null,
-  };
-}
-
-/** Aggregate a source document across its printings, the way `AGGREGATE_CARD` does. */
-function aggregate(source: SourceCard, id: string, printingOracleId?: string): OracleCard {
-  const thumbnails = thumbnailsOf(source);
-  const twoFaced = (source.card_faces ?? []).length > 1;
-
-  return {
-    id,
-    name: source.name,
-    card_count: 1,
-    cards: [printing(source, printingOracleId)],
-    card_text: source.oracle_text ?? null,
-    cmc: source.cmc ?? 0,
-    colors: source.colors ?? [],
-    mana_cost: source.mana_cost ?? null,
-    rarity: source.rarity ?? "common",
-    type_line: source.type_line ?? null,
-    thumbnail: twoFaced ? null : thumbnails[0],
-    faces_thumbnails: twoFaced ? thumbnails : null,
-    // Structurally null in production too: both ingestion tasks delete
-    // edhrec_rank before insert and CARD_PROJECTION projects neither rank.
-    edhrec_rank: null,
-    penny_rank: null,
-  };
-}
 
 /**
  * #22 - reversible cards, keyed on the *face* oracle id.
