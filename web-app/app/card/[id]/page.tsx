@@ -19,10 +19,46 @@ interface CardPageProps {
   params: Promise<{ id: string }>;
 }
 
+// Every link-unfurling client - Slack, Discord, WhatsApp, iMessage, X - reads
+// og: and twitter: tags and nothing else, so a shared card used to arrive as a
+// bare line of text next to a blank box (#41). The card art is the single most
+// useful thing a preview could show, and the API already hands it over.
+//
+// The same fetch as the page body below: getCardByOracleId is a tagged, cached
+// fetch, so metadata and content share one upstream request.
 export async function generateMetadata({ params }: CardPageProps): Promise<Metadata> {
   const { id } = await params;
   const card = await getCardByOracleId(id);
-  return { title: card ? `${card.name} - MTG Card Search` : "Card not found" };
+
+  // No image on a 404: unfurling with somebody else's artwork would be worse
+  // than unfurling with none.
+  if (!card) return { title: "Card not found" };
+
+  const title = `${card.name} - MTG Card Search`;
+  const description = card.card_text || card.type_line || `${card.name} on MTG Card Search`;
+  // faces_thumbnails is the double-faced case, where there is no single front
+  // image - preview the front face.
+  const image = card.thumbnail || card.faces_thumbnails?.[0];
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      siteName: "MTG Card Search",
+      images: image ? [{ url: image, alt: card.name }] : undefined,
+    },
+    twitter: {
+      // A card is a 5:7 portrait; the large-image style is the only one that
+      // shows enough of it to be worth having.
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
 }
 
 export default async function CardPage({ params }: CardPageProps) {

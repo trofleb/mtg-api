@@ -17,15 +17,15 @@ const RARITY_EMOJI = {
 interface CardTileProps {
   card: OracleCard;
   /**
-   * Query string of the search this tile was rendered for, threaded into the
-   * card link so the card page can offer a back link that returns to it (#39).
-   * Declared here so the spec that pins the behaviour typechecks; it is not
-   * honoured yet.
+   * Query string of the search this tile was rendered for. It rides along in
+   * the card's own URL, which is the only place it can survive a refresh or a
+   * shared link - and it is what lets the card page offer a "Back to search"
+   * that returns to the results the user actually had (#39).
    */
   from?: string;
 }
 
-export function CardTile({ card }: CardTileProps) {
+export function CardTile({ card, from }: CardTileProps) {
   const thumbnail = card.thumbnail || card.faces_thumbnails?.[0];
   const rarityEmoji = card.rarity ? RARITY_EMOJI[card.rarity as keyof typeof RARITY_EMOJI] : "⚪";
 
@@ -39,6 +39,7 @@ export function CardTile({ card }: CardTileProps) {
   // Rendered without the wrapper rather than skipped: the card is real and
   // hiding it would silently shorten the results.
   const linkable = Boolean(card.id);
+  const href = from ? `/card/${card.id}?${from}` : `/card/${card.id}`;
 
   const tile = (
     <Card
@@ -86,7 +87,7 @@ export function CardTile({ card }: CardTileProps) {
   }
 
   return (
-    <Link href={`/card/${card.id}`} scroll={false} data-testid="card-item">
+    <Link href={href} scroll={false} data-testid="card-item">
       {tile}
     </Link>
   );

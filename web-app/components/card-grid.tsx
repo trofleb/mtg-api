@@ -6,9 +6,11 @@ import type { OracleCard } from "@/lib/api";
 
 interface CardGridProps {
   cards: OracleCard[];
+  /** Query string of the search these results came from; see CardTile (#39). */
+  from?: string;
 }
 
-export function CardGrid({ cards }: CardGridProps) {
+export function CardGrid({ cards, from }: CardGridProps) {
   if (cards.length === 0) {
     return <p className="text-muted-foreground py-12 text-center">No cards found.</p>;
   }
@@ -16,7 +18,7 @@ export function CardGrid({ cards }: CardGridProps) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
       {cards.map((card) => (
-        <CardTile key={card.id} card={card} />
+        <CardTile key={card.id} card={card} from={from} />
       ))}
     </div>
   );

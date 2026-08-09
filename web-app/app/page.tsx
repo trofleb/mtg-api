@@ -62,7 +62,10 @@ export default async function Home({ searchParams }: HomeProps) {
             </div>
           )}
 
-          <CardGrid cards={results.cards} />
+          {/* `from` rides along in each card's URL so the card page can offer
+              a back link to these exact results rather than to DEFAULT_QUERY
+              (#39). Includes the cursor, so paging is preserved too. */}
+          <CardGrid cards={results.cards} from={buildSearchParams(state)} />
 
           {(state.cursor || nextHref) && (
             <div className="flex justify-center gap-2 pt-4">
