@@ -38,6 +38,11 @@ jobs:
               # then regenerates its types from the tampered document and passes.
               - 'openapi.json'
               - 'scripts/**'
+              # tests/fixtures/reversible_cards.py loads this file, and the
+              # MSW stub builds its fixtures from the same copy. Editing it
+              # for the frontend's benefit changes what pytest asserts on, so
+              # the backend job has to re-run.
+              - 'web-app/e2e/stub/data/**'
             web-app:
               - 'web-app/**'
               - 'openapi.json'
@@ -157,6 +162,29 @@ jobs:
       - name: Run component tests (Browser Mode)
         working-directory: web-app
         run: pnpm run test:browser
+
+      # Playwright tiers A and B. Neither needs a database, a Docker stack or
+      # a tunnel: A boots `next start` and asserts things that are true with
+      # no data at all, B boots the same server with API_URL pointed at the
+      # node stub in e2e/stub/. Tier C (e2e/live/) is deliberately not
+      # discovered by this config - it needs the real stack and runs after a
+      # deploy, from playwright.live.config.ts.
+      #
+      # This is the first time Playwright has run in CI. It could not before:
+      # e2e/api.spec.ts talked straight to FastAPI behind a skip that fired
+      # whenever the API was not exposed, and card-search.spec.ts asserted
+      # against live production data.
+      - name: Run e2e tiers A and B
+        working-directory: web-app
+        run: pnpm run test:e2e --reporter=list
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web-app/playwright-report/
+          retention-days: 7
 
   scripts-test:
     needs: changes
