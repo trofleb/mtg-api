@@ -275,6 +275,13 @@ Depends on 0b for the generated types.
 - `e2e/{static,stubbed,live}/` split; move `api.spec.ts`'s assertions to pytest and delete it
   from the Playwright suite
 - both Playwright configs; Tiers A and B in the `test-web-app` job
+- **split the configs so `e2e/live/` is not swept up by the default run.** `playwright.config.ts`
+  still has `testDir: "./e2e"`, so Branch 1's live spec is currently inside default discovery.
+- **promote Branch 1's `#34` spec from Tier C to Tier B** — assertions unchanged, only `API_URL`
+  moves.
+- **absorb `tests/fixtures/reversible_cards.py`**, added by Branch 3, whose own module docstring
+  flags it as a temporary home. Build the MSW fixtures from the *same two documents* so pytest
+  and Tier B cannot disagree about what a reversible card looks like.
 
 ---
 
@@ -395,8 +402,22 @@ React's `key={card.id}` if two ever share a page.
 With 0b landed, the `id`-required response model turns this from a silent `""` into a
 validation error at the boundary — which is the real fix. The guard is defence in depth.
 
-**Files:** `api/helpers/cards_mongo.py`, `web-app/components/card-tile.tsx`,
-`web-app/lib/api.ts`
+**Files:** `api/helpers/cards_mongo.py`, **`api/router/cards.py`**,
+`web-app/components/card-tile.tsx`, `web-app/lib/api.ts`
+
+**The Files list was incomplete — `api/router/cards.py` belongs in it.** Fixing the grouping key
+alone produces an id that then **404s**, because `/cards/oracle/{id}/aggregated` matched
+top-level `oracle_id` only. That red was attested separately during implementation.
+
+**The "must not deploy without 3" claim was CONFIRMED, and was understated.** Measured before
+any fix: `GET /cards/search/creature` returned **HTTP 500 with zero cards**, and the failure
+locus `('response','cards',0,'id')` independently confirms the null-keyed group sorts first. 0b
+alone does not degrade one tile — **it returns nothing for any search touching a reversible
+card.**
+
+**Production follow-up no test can catch:** `oracle_id_match()` emits an `$or` whose second
+branch is `{"card_faces.oracle_id": …}`. Without a MongoDB index on `card_faces.oracle_id` that
+is a collection scan on **every card-page load**. Ship the index in the same deploy.
 
 ---
 
@@ -627,8 +648,18 @@ that runs against Tier C today and gets promoted to Tier B later.
 **Branch 12 does not wait for 0d.** Tier A needs only `next start`, so #31/#32 can land as a
 CI step against a bare build.
 
-**Branches 2, 4, 5 and 13 all touch `api/router/cards.py`.** Run them in that order rather
-than in parallel.
+**Branches 2, 3, 4, 5 and 13 all touch `api/router/cards.py`.** Run them in that order rather
+than in parallel. **Branch 3 was missing from this list** — it edits the two oracle-lookup
+handlers. 2 and 3 turned out to be hunk-disjoint and merged without conflict, but that was luck.
+
+**`api/router/cards.py` is ~298 lines**, over the 200-line guideline. Pre-existing (306 before
+this work). Both implementers deliberately deferred the split because 4, 5 and 13 all edit it;
+do it as its own branch after 13.
+
+**A live tripwire for Branches 4 and 5.** The mock raises `ValueError` if `$meta` is requested
+with no `$text` in the query, and Branch 2 now requests `$meta` unconditionally. That is safe
+only because `"$text"` is unconditional in `match_conditions` (`api/router/cards.py:109`) — which
+is exactly the query construction those two branches rewrite.
 
 **#40 is split deliberately.** Its search-form parts ride with Branch 6 because both rewrite
 that component; the modal and tile parts stay in Branch 11.
@@ -647,20 +678,33 @@ Suggested order:
 Branches 8–11 are Component-layer only and fully parallel once 0c has landed — they need
 neither 0b nor 0d.
 
-### Status as of 2026-08-07
+### Status as of 2026-08-09
 
 | | State |
 |---|---|
-| **0c** | ✅ **merged** — `test/component-layer`. Real Chromium in CI, 37 unit + 2 browser specs green. |
-| **1** (#34) | 🟡 implemented, **red never attested**. Needs a production build to verify. |
-| **0a** | 🟡 implemented, holds CI red by design. Merge with Branch 2. |
-| **0b** | 🟡 implemented, **two open defects**: `colors` literal 500s, and the paths-filter bypass. Do not deploy without Branch 3. |
+| **0c** | ✅ merged — `test/component-layer`. Real Chromium in CI. |
+| **0a + 2** (#21, #24) | ✅ **integrated** — `integration/unit-2` |
+| **0b + 3** (#22) | ✅ **integrated** — including both 0b defect fixes |
+| **1** (#34) | 🟡 implemented, **red never attested**. Needs `next build && next start`. |
 
-1, 0a and 0b are preserved on `wip/foundations-0a-0b-34`, off `test/component-layer`. Snapshot
-of the raw workflow output is on `wip/workflow-snapshot`.
+**`integration/unit-2` is fully green — the first time the suite has been.** Verified on the
+combined tree, which no individual agent had ever run:
 
-**Next unit of work:** `[0a + 2]` then `[0b + 3]`, including the two 0b defect fixes. That
-restores a green suite, makes 0b safe to deploy, and closes #21, #22 and #24.
+| Gate | Result |
+|---|---|
+| `uv run pytest -q` | **322 passed, 0 failed** — stable across 4 randomised orders |
+| `ruff check` / `format --check` | clean |
+| `generate_openapi.py --check` | current |
+| `pnpm check` / `typecheck` | clean (4 pre-existing warnings) |
+| `generate:api-types` + `git diff --exit-code` | in sync |
+| `pnpm test:run` / `test:browser` | 39 passed / 5 passed + 1 expected fail |
+
+The `1 expected fail` is #36, held red by `test.fails` for Branch 6.
+
+**Closed:** #21, #22, #24, and both of 0b's blocking defects. **0b is now safe to deploy** —
+but only as part of this integrated branch, never alone.
+
+**Next:** 0d (critical path), or Branches 12 and 8–11 (all cheap and unblocked, see below).
 
 ---
 
@@ -693,11 +737,29 @@ Two concrete consequences, both found by adversarial verification of 0b:
   `ResponseValidationError`. Because the null-keyed group sorts *first*, affected searches would
   return **nothing** instead of 20 results with one bad tile. 0b alone is a regression.
 - **Narrowing is as dangerous as requiring.** `colors: list[Color]` 500s on `colors=["C"]`.
-  Whether production emits `"C"` is still **unverified** — the API is not publicly exposed. That
-  unquantified exposure is itself the problem.
+  ✅ Fixed, and the risk is now characterised properly rather than left as "unverified":
+  both ingestion paths (`tasks/fetch_dataset.py:126`, `tasks/ifetch_dataset.py:131`) insert
+  Scryfall bulk JSON **verbatim**, and Scryfall writes colourless as `[]` — so the specific
+  `["C"]` document is probably absent under the current single writer. The accurate framing is
+  the general one: **nothing validates a card on the way in** (`PrintedCard` is imported by
+  tests only), so no narrowing on these models has ever been *verified* against production —
+  only left unfalsified. Precedent already in the tree: `common/scyfall_models.py:107` types
+  `produced_mana` as `Optional[List[str]]` while its siblings at 92–94 are `List[Color]`,
+  precisely because Scryfall's `produced_mana` carries `"C"`.
+
+A structural guard now enforces this: `tests/api/test_response_model_strictness.py` fails on any
+future `Literal`, `UUID`/`Url`, `Field` constraint, or newly-required field added to the response
+models. The rule is executable, not just written down here.
 
 **Visual regression is deferred.** Not in scope; revisit once the Component layer has settled
 and there is a design system worth pinning.
+
+**New issue found during `[0b + 3]`, not yet filed.** Both ingestion tasks
+`del card["edhrec_rank"]` before insert, and `CARD_PROJECTION` projects neither rank field — so
+`AGGREGATE_CARD`'s `{"$max": "$edhrec_rank"}` and `{"$max": "$penny_rank"}` are **structurally
+always null in every aggregated response**. The fields are declared on the response model and
+consumed by the client, so this is dead data end to end. Decide whether to populate them or drop
+them from the contract; do not leave both sides pretending they work.
 
 ---
 
@@ -727,11 +789,28 @@ Stated so nobody writes a test that passes for the wrong reason:
     while scoring only weighs six whitelisted fields. A document can therefore match and score
     0.0, and short queries match everything: the query `"a"` matches all 12 sample cards. A test
     written on top of this can assert against an artificially broad result set.
-  - **`_apply_projection` silently drops `CARD_PROJECTION`'s computed fields**
-    (`thumbnail: "$image_uris.normal"`, `faces_thumbnails`), so they are always absent from
-    mocked results. Directly relevant to Branch 8/#35 backend coverage.
+  - ~~**`_apply_projection` silently drops `CARD_PROJECTION`'s computed fields**~~ ✅ **fixed**
+    by Branch 3, which added a real expression evaluator (`tests/mocks/mongo_expressions.py`).
+    `thumbnail` and `faces_thumbnails` are now populated, so **#35 is testable at the backend
+    layer** — the plan previously said it was not.
 - **Browser specs are excluded from coverage.** `test:coverage` is scoped `--project unit`, so
   once Branches 8–11 add browser specs their coverage never appears in the report.
+- **A harness can ship broken and look fine — 0c did.** `vitest.setup.browser.ts`'s `next/image`
+  and `next/link` mocks never worked: both modules are CJS and the factories omitted
+  `__esModule`, so React received the namespace object and threw `Element type is invalid`.
+  Nothing caught it because 0c's only spec rendered neither module. **Branches 8, 9, 10 and 11
+  would each have hit this wall.** Found and fixed while implementing Branch 3. The lesson
+  generalises: a harness whose first test does not exercise its mocks has not been tested.
+- **Mock-coupled assertions do not port to real MongoDB.** Branch 2's ranking test uses a decoy
+  (`Giant Growth` matching the query `"sol ring"`) that works *only* because the mock
+  substring-matches `"ring"` inside the artist `"Sandra Everingham"`. Real `$text` tokenises and
+  would not match it at all, so that guard assertion would fail if ported to a live-Mongo suite.
+  Deliberate and sound in the mock — it makes the test strictly stronger there — but flagged so
+  nobody ports it blind.
+- **Tooling that walks the repo also walks `.claude/worktrees/`.** With agent worktrees present,
+  `ruff check --exclude "notebooks/**" .` reported 36 E402 errors — every one from a *worktree's*
+  copy of `notebooks/`, because the exclude pattern is not anchored. Remove worktrees before
+  trusting a repo-wide lint result.
 
 ---
 
