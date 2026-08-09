@@ -38,9 +38,15 @@ async function firstCardId(request: APIRequestContext): Promise<string> {
   const response = await request.get("/");
   expect(response.status(), "the results grid has to render to supply a card id").toBe(200);
 
-  // Tiles link to /card/<id>. [^"/]+ also skips the id-less link #22 produces,
+  // Tiles link to /card/<id>. [^"/?]+ also skips the id-less link #22 produces,
   // which renders as href="/card" with no id segment at all.
-  const match = /href="\/card\/([^"/]+)"/.exec(await response.text());
+  //
+  // `?` is excluded because tiles now append the originating search to the href
+  // (#39): href="/card/<id>?q=Black+Lotus". Without it the capture swallowed the
+  // query string - and once a filter was active, the HTML-escaped "&amp;" with
+  // it, which would have started sending malformed URLs from a spec whose whole
+  // job is to tell a 404 from a 200.
+  const match = /href="\/card\/([^"/?]+)"/.exec(await response.text());
   expect(match, "no card link on the homepage - is the API returning results?").not.toBeNull();
 
   return (match as RegExpExecArray)[1];
