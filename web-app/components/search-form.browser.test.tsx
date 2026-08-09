@@ -72,7 +72,7 @@ test("the harness renders with real Tailwind and a real layout engine", async ()
 // FIXED BY BRANCH 6 (`fix/search-form`), NOT HERE. It is marked `.fails` so
 // CI stays green while the assertion stays in the tree. When Branch 6 lands,
 // this reports "expected to fail, but passed" - drop the `.fails` then.
-test.fails("#36 - search input keeps a usable share of its row at 320px", async () => {
+test("#36 - search input keeps a usable share of its row at 320px", async () => {
   const { input, row } = await renderAtWidth(320);
 
   const inputWidth = input.getBoundingClientRect().width;
