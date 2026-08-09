@@ -16,6 +16,13 @@ const RARITY_EMOJI = {
 
 interface CardTileProps {
   card: OracleCard;
+  /**
+   * Query string of the search this tile was rendered for, threaded into the
+   * card link so the card page can offer a back link that returns to it (#39).
+   * Declared here so the spec that pins the behaviour typechecks; it is not
+   * honoured yet.
+   */
+  from?: string;
 }
 
 export function CardTile({ card }: CardTileProps) {
