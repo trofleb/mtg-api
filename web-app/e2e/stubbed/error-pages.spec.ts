@@ -9,12 +9,14 @@ import { ALL_CARDS, BLACK_LOTUS_ID, BOGUS_CARD_ID } from "../stub/fixtures";
  * Both are Tier B and neither is component-testable, for reasons worth
  * restating so nobody "promotes" them down a layer later:
  *
- *   - The subject is Next's boundary resolution walking the route tree. The
- *     fix is a *file that does not exist yet*, not a change to a component,
- *     so there is no component to render in a component test.
+ *   - The subject is Next's boundary resolution walking the route tree, not a
+ *     component. Rendering `app/not-found.tsx` directly - which
+ *     `test/route-boundaries.test.tsx` does - says nothing about whether the
+ *     router ever reaches it, which is the whole question.
  *   - "Without JavaScript" is a property of the transport, not of the tree.
  *     A component test cannot observe pre-hydration HTML; Browser Mode always
- *     has JS.
+ *     has JS. This is what caught the fact that a boundary file does not fix
+ *     the no-JS case at all - see the last group in this file.
  *   - The ISR cache is server-side state in `.next/cache`, visible only
  *     across two requests to the same running server.
  *
@@ -64,8 +66,84 @@ function freshUnknownCardId(): string {
   return id;
 }
 
-test.describe("an unknown card without JavaScript (#29)", () => {
+test.describe("an unknown card (#29)", () => {
+  test("renders the app's own not-found page, with a way out", async ({ page }) => {
+    const response = await page.goto(`/card/${BOGUS_CARD_ID}`);
+
+    expect(response?.status(), "an id no card has must answer 404").toBe(404);
+
+    // The half of #29 that a boundary file does fix. Next's built-in fallback
+    // is a bare "404 | This page could not be found" with no links in it at
+    // all, so a visitor who followed a stale shared link had nothing to click.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(
+      page.locator('a[href="/"]'),
+      "the not-found page has to offer a way back to the search"
+    ).toHaveCount(1);
+  });
+});
+
+test.describe("a URL that matches no route, without JavaScript (#29)", () => {
   test.use({ javaScriptEnabled: false });
+
+  test("renders visible text rather than an empty page", async ({ page }) => {
+    // An unmatched URL is served from the prerendered /_not-found route, which
+    // is an ordinary successful render - so app/not-found.tsx reaches the HTML
+    // here, and this is the case where the boundary file fixes the no-JS
+    // experience outright. Contrast the test below.
+    const response = await page.goto("/no-such-page-at-all");
+
+    expect(response?.status()).toBe(404);
+
+    const visible = (await page.locator("body").innerText()).trim();
+
+    expect(
+      visible.length,
+      `nothing was painted before hydration: ${JSON.stringify(visible)}`
+    ).toBeGreaterThan(0);
+    await expect(page.locator('a[href="/"]')).toHaveCount(1);
+  });
+});
+
+/**
+ * The half of #29 that adding a boundary file does NOT fix.
+ *
+ * Held red on purpose, in the same way #36 is: the assertion is the behaviour
+ * we want, `test.fail()` records that Next does not currently provide it, and
+ * the run goes red the day it starts passing - which is the signal to delete
+ * this wrapper.
+ *
+ * The plan attributed the blank page to the `@modal` parallel slot making
+ * Next's built-in fallback resolve client-side. That is not the cause, and it
+ * was worth finding out, because it means the plan's fix could not have worked:
+ *
+ *   - with `app/@modal/` moved out of the route tree entirely, `/card/<bogus>`
+ *     still served `<html id="__next_error__">` with an empty body;
+ *   - a three-line probe page whose whole body is `notFound()`, with no data,
+ *     no `revalidate` and no `generateStaticParams`, did the same;
+ *   - so did a probe page that simply threw, which is `error.tsx`'s case.
+ *
+ * The cause is in `next/dist/server/app-render/app-render.js`: `notFound()`
+ * propagates out of the HTML render, and the catch block answers with
+ * `getErrorRSCPayload`, whose seed data is a hardcoded empty
+ * `<html id="__next_error__">`. The real boundary tree only ever reaches the
+ * browser inlined in the flight payload, so it cannot paint until React runs.
+ * `createNotFoundLoaderTree`, the function that would render a not-found tree
+ * server-side, is called on exactly one path in that file: server actions.
+ *
+ * Next 16.0.3. Nothing in `app/` can change it - the levers are all inside the
+ * framework's error path. `experimental.globalNotFound` is the one avenue not
+ * tried here; reading the code it does not touch this path, and it is an
+ * experimental flag, so it was not worth spending the app's stability on.
+ */
+test.describe("an unknown card without JavaScript (#29, unfixed)", () => {
+  test.use({ javaScriptEnabled: false });
+
+  test.fail(
+    true,
+    "Next 16.0.3 serves notFound() as an empty __next_error__ document; the 404 UI is " +
+      "client-rendered from the flight payload"
+  );
 
   test("renders visible text rather than an empty page", async ({ page }) => {
     const response = await page.goto(`/card/${BOGUS_CARD_ID}`);
@@ -76,30 +154,35 @@ test.describe("an unknown card without JavaScript (#29)", () => {
 
     expect(
       visible.length,
-      "the 404 body is empty before hydration. With no not-found boundary in the route " +
-        "tree, Next falls back to its built-in one - which the @modal parallel slot makes " +
-        "a client component prop, so the server streams the page's entire visible content " +
-        "inside the flight payload and paints nothing until JS runs. What actually reached " +
-        `the browser here: ${JSON.stringify(visible)}`
+      `nothing was painted before hydration: ${JSON.stringify(visible)}`
     ).toBeGreaterThan(0);
-  });
-
-  test("offers a link back into the app", async ({ page }) => {
-    await page.goto(`/card/${BOGUS_CARD_ID}`);
-
-    // A dead end is the other half of #29: even once it hydrates, the built-in
-    // fallback is a bare "404 | This page could not be found" with no links at
-    // all, so the only way out is the back button - and there is none at all on
-    // a shared link opened cold.
-    await expect(
-      page.locator('a[href="/"]'),
-      "the not-found page has to offer a way back to the search"
-    ).toHaveCount(1);
   });
 });
 
+/**
+ * The assertion below is about the *lifetime* of the cached 404, not about
+ * whether it is cached at all - and that is a correction to this plan, made
+ * after measuring rather than by preference.
+ *
+ * The intended assertion was "two requests, x-nextjs-cache MISS then HIT",
+ * i.e. an unknown card must not be replayed from the cache at all. Not
+ * reachable: `generateStaticParams` on this route puts on-demand renders in
+ * *prerender* mode, and the one API that would opt a render out of the cache
+ * - `connection()` - is a dynamic API, which prerender mode answers with a
+ * hard `DYNAMIC_SERVER_USAGE` 500. Attested: with `connection()` in the
+ * not-found branch, every unknown id returned HTTP 500 instead of 404.
+ *
+ * So a cache HIT is not the defect and never could have been. The defect is
+ * the *hour*: the 404 inheriting the lifetime of a real card page. That is
+ * both what the issue describes and what the plan's own Fix section asks for
+ * ("give the not-found branch its own short revalidate"), so the assertion
+ * moved onto it. It still fails on the unfixed code, with the same two
+ * requests - see the second test in this group, whose red was
+ * `Cache-Control: s-maxage=3600 [...] will hold "this card does not exist"
+ * for 3600s`.
+ */
 test.describe("the 404 for an unknown card and the ISR cache (#30)", () => {
-  test("is not replayed from the cache on the next request", async ({ request }) => {
+  test("is not replayed from an hour-old cache entry", async ({ request }) => {
     const path = `/card/${freshUnknownCardId()}`;
 
     const first = await request.get(path);
@@ -108,15 +191,18 @@ test.describe("the 404 for an unknown card and the ISR cache (#30)", () => {
     expect(first.status(), "an id no card has must answer 404").toBe(404);
     expect(second.status(), "and must keep answering 404").toBe(404);
 
+    const maxAge = sMaxAge(second.headers()["cache-control"]);
+
     expect(
-      second.headers()["x-nextjs-cache"],
-      "the 404 was written to the ISR cache and served back from it. " +
-        `First request: x-nextjs-cache=${first.headers()["x-nextjs-cache"]}, ` +
-        `cache-control=${first.headers()["cache-control"]}. The route's ` +
-        "`export const revalidate = 3600` is a segment-level value, so it applies to the " +
-        "not-found branch exactly as it does to a real card - and a card that gets ingested " +
-        "in the next hour stays a 404 for everyone who already asked"
-    ).not.toBe("HIT");
+      maxAge !== null && maxAge <= NOT_FOUND_MAX_AGE_CEILING_SECONDS,
+      "the second request was answered from the ISR cache with a real card page's " +
+        `lifetime. x-nextjs-cache: ${first.headers()["x-nextjs-cache"]} then ` +
+        `${second.headers()["x-nextjs-cache"]}; cache-control: ` +
+        `${second.headers()["cache-control"]}. The route's ` +
+        "`export const revalidate = 3600` is a segment-level value, so it applied to the " +
+        "not-found branch exactly as it did to a real card - and a card ingested a minute " +
+        "later stayed missing for the rest of the hour, for everyone who asked"
+    ).toBe(true);
   });
 
   test("is not given a real card page's hour-long lifetime", async ({ request }) => {

@@ -11,11 +11,10 @@ import NotFound from "@/app/not-found";
  *
  * Next resolves `notFound()` and a thrown render error by walking up from the
  * segment looking for `not-found.tsx` / `error.tsx`. With none anywhere in
- * `app/`, it falls back to its own built-in pages - and because of the
- * `@modal` parallel slot those resolve client-side only, so the server sends
- * a body with no visible text at all. Tier B
- * (`e2e/stubbed/error-pages.spec.ts`) asserts that consequence over HTTP with
- * JavaScript disabled, which is the only place it is observable.
+ * `app/`, it falls back to its own built-in pages: a bare "404 | This page
+ * could not be found" with no links in it, and an error page with no way to
+ * retry. Tier B (`e2e/stubbed/error-pages.spec.ts`) asserts what the router
+ * actually serves, including the part of #29 these files cannot fix.
  *
  * What this file adds is the part Tier B cannot reach: that the boundaries
  * are at the *root*, so they cover every segment rather than just the one

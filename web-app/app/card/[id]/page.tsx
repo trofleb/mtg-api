@@ -15,6 +15,49 @@ export async function generateStaticParams() {
   return [];
 }
 
+// How long a "no such card" answer may be kept (#30).
+//
+// A card id that 404s today is one the next ingest run can make real, so the
+// answer has to be cheap to be wrong about. An hour was not: the first request
+// for an unknown id wrote a 404 into the ISR cache and every request after it
+// - including through any shared cache, given the s-maxage - was served that
+// same 404 until the hour was up.
+const NOT_FOUND_REVALIDATE_SECONDS = 60;
+
+/**
+ * Lower *this render's* cache lifetime to the not-found one.
+ *
+ * The shape here is forced, so it is worth writing down why rather than
+ * leaving it to look arbitrary.
+ *
+ * `export const revalidate` is a static, segment-level module export: one
+ * value for every branch of the page. The only runtime input to it is
+ * `next.revalidate` on a fetch, and Next takes the *minimum* of the two - a
+ * fetch can lower the segment's value but never raise it. So the segment has
+ * to carry the maximum (the hour a real card gets) and the branch that wants
+ * less has to ask for less. That is what this does.
+ *
+ * The fetch has to be a real fetch for Next's instrumentation to see it, but
+ * it does not have to go anywhere: a `data:` URL is resolved in-process, costs
+ * no I/O and cannot fail. It is doing nothing but carrying the number.
+ *
+ * The obvious alternative - `connection()`, to opt the miss out of caching
+ * altogether - is not available here, and that was measured rather than
+ * assumed: `generateStaticParams` above puts on-demand renders in prerender
+ * mode, where any dynamic API is a hard `DYNAMIC_SERVER_USAGE` 500. Every
+ * unknown card id returned HTTP 500 with it.
+ *
+ * If a future Next stops routing `data:` through its fetch patch this quietly
+ * reverts to the hour, which is exactly the kind of silent regression this
+ * repo has been bitten by - so `e2e/stubbed/error-pages.spec.ts` asserts the
+ * resulting `s-maxage` rather than trusting the mechanism.
+ */
+async function declareNotFoundCacheLifetime(): Promise<void> {
+  await fetch("data:text/plain,card-not-found", {
+    next: { revalidate: NOT_FOUND_REVALIDATE_SECONDS },
+  });
+}
+
 interface CardPageProps {
   params: Promise<{ id: string }>;
 }
@@ -65,7 +108,14 @@ export default async function CardPage({ params }: CardPageProps) {
   const { id } = await params;
   const card = await getCardByOracleId(id);
 
-  if (!card) notFound();
+  if (!card) {
+    // Only on the miss: doing this unconditionally would drop the whole
+    // route to a minute and throw away PR #17's caching win - which
+    // error-pages.spec.ts guards with a control assertion, and which #34's
+    // spec reads as its "does this server prerender at all" tripwire.
+    await declareNotFoundCacheLifetime();
+    notFound();
+  }
 
   return (
     <main className="min-h-screen p-8">
