@@ -23,13 +23,35 @@ v4 UUID would become a 500 rather than a card. The generated TypeScript is
 ``string`` either way, so the strictness would buy nothing and cost
 availability. Strictness is spent where it is worth an outage instead - on
 ``id``, below.
+
+The same reasoning removed the one hierarchy type this module did reuse.
+``colors``/``color_identity`` were ``list[Color]``, i.e. the closed
+``Literal["W","U","B","R","G"]``, so a stored card carrying the colorless
+code ``["C"]`` raised ``ResponseValidationError`` and the caller got a 500
+instead of a card. Scryfall writes colorless as ``[]``, but MTGJSON and
+several Scryfall-adjacent dumps write ``["C"]``, and nobody could check
+which the production collection holds. That unquantified exposure is the
+point: on a *response* model, narrowing is an availability risk rather than
+a coverage question, because there is no bad-input path to reject - only a
+card the client no longer receives. The value set is documented in the
+field description instead, which reaches clients as a JSDoc comment on the
+generated TypeScript and rejects nothing.
+
+``tests/api/test_response_model_tolerance.py`` holds that line: it fails if
+a closed literal, a format constraint or an undeclared required field
+reappears on any of these models.
 """
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from common.scyfall_models import Color
+COLOR_DESCRIPTION = (
+    "Colour codes. Normally W, U, B, R or G; colourless is usually an empty "
+    "list, though some sources write the code C instead. Not validated "
+    "against a fixed set - an unrecognised code is passed through rather "
+    "than failing the response."
+)
 
 
 class CardPrinting(BaseModel):
@@ -51,17 +73,23 @@ class CardPrinting(BaseModel):
     type_line: Optional[str] = None
     mana_cost: Optional[str] = None
     cmc: Optional[float] = None
-    colors: Optional[list[Color]] = None
-    color_identity: Optional[list[Color]] = None
+    colors: Optional[list[str]] = Field(default=None, description=COLOR_DESCRIPTION)
+    color_identity: Optional[list[str]] = Field(
+        default=None, description=COLOR_DESCRIPTION
+    )
     artist: Optional[str] = None
     layout: Optional[str] = None
     flavor_name: Optional[str] = None
     flavor_text: Optional[str] = None
     games: Optional[list[str]] = None
-    image_uris: Optional[dict[str, str]] = None
+    # dict[str, str] would be a claim that every value of somebody else's
+    # object is a string; a single null failed the whole card. Scryfall uses
+    # nulls for absent values in the sibling "prices" object, so the
+    # convention exists in these very documents.
+    image_uris: Optional[dict[str, Optional[str]]] = None
     promo: Optional[bool] = None
     rarity: Optional[str] = None
-    related_uris: Optional[dict[str, str]] = None
+    related_uris: Optional[dict[str, Optional[str]]] = None
     released_at: Optional[str] = None
     reprint: Optional[bool] = None
     set: Optional[str] = None
@@ -97,7 +125,7 @@ class OracleCard(BaseModel):
     type_line: Optional[str] = None
     mana_cost: Optional[str] = None
     cmc: Optional[float] = None
-    colors: Optional[list[Color]] = None
+    colors: Optional[list[str]] = Field(default=None, description=COLOR_DESCRIPTION)
     rarity: Optional[str] = None
     edhrec_rank: Optional[int] = None
     penny_rank: Optional[int] = None
