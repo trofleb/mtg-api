@@ -17,8 +17,9 @@ import { Button } from "@/components/ui/button";
  * this markup is in the HTML.
  *
  * It does *not* fix the no-JS case for `notFound()` thrown from a page. That
- * is a Next 16.0.3 behaviour with no lever in `app/`, measured and written up
- * in `e2e/stubbed/error-pages.spec.ts`, where the assertion is kept red.
+ * is a Next 16 behaviour, still present in 16.3.3, with no lever in `app/`,
+ * measured in `e2e/stubbed/error-pages.spec.ts`, where the assertion is kept
+ * red.
  *
  * That spec also asserts exactly one `a[href="/"]` here, so keep it to a
  * single way home.

@@ -131,17 +131,18 @@ test.describe("a URL that matches no route, without JavaScript (#29)", () => {
  * `createNotFoundLoaderTree`, the function that would render a not-found tree
  * server-side, is called on exactly one path in that file: server actions.
  *
- * Next 16.0.3. Nothing in `app/` can change it - the levers are all inside the
- * framework's error path. `experimental.globalNotFound` is the one avenue not
- * tried here; reading the code it does not touch this path, and it is an
- * experimental flag, so it was not worth spending the app's stability on.
+ * Next 16, re-checked on 16.3.3. Nothing in `app/` can change it - the levers
+ * are all inside the framework's error path. `experimental.globalNotFound` is
+ * the one avenue not tried here; reading the code it does not touch this path,
+ * and it is an experimental flag, so it was not worth spending the app's
+ * stability on.
  */
 test.describe("an unknown card without JavaScript (#29, unfixed)", () => {
   test.use({ javaScriptEnabled: false });
 
   test.fail(
     true,
-    "Next 16.0.3 serves notFound() as an empty __next_error__ document; the 404 UI is " +
+    "Next 16.3.3 serves notFound() as an empty __next_error__ document; the 404 UI is " +
       "client-rendered from the flight payload"
   );
 

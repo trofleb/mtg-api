@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
  * error page, which offers no way out and no way to retry.
  *
  * Like `notFound()`, a thrown error reaches the browser only in the flight
- * payload in Next 16.0.3 (probed: a page that just throws serves an empty
+ * payload in Next 16 (probed on 16.0.3: a page that just throws serves an empty
  * `<html id="__next_error__">`), so this paints after hydration rather than in
  * the HTML. That is a limit of the framework's error path, not of this file.
  *
