@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22-slim AS builder
+FROM node:22.23.2-slim AS builder
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -19,19 +19,27 @@ COPY . .
 RUN pnpm run build
 
 # Production stage
-FROM node:22-slim AS runner
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+FROM node:22.23.2-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Must exist and belong to `node` before the COPYs below land in it: COPY
+# would otherwise create it root-owned, and mounting next_cache at
+# .next/cache does nothing for its parent. Measured: uid 1000 cannot write a
+# root-owned /app/.next. The cache mount itself needs no ownership fix - it
+# is tmpfs, which comes up 1777.
+RUN mkdir .next && chown node:node .next
+
 # Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+
+# Drop privileges. Every other service in the stack does; this one is last.
+# `node` (uid 1000) ships with the base image, so there is no user to create.
+USER node
 
 # Expose port
 EXPOSE 3000
