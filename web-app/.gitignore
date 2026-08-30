@@ -35,3 +35,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Ad-hoc exploration scripts (Playwright probes against a deployed site)
+.explore/
